@@ -103,3 +103,8 @@ export function withProjectCounts(projects: Project[], notes: Note[]) {
     return { ...p, noteCount, sourceCount };
   });
 }
+
+/** Projects that actually have notes — empty leftovers stay hidden. */
+export function projectsWithNotes(projects: Project[], notes: Note[]) {
+  return withProjectCounts(projects, notes).filter((p) => p.noteCount > 0);
+}

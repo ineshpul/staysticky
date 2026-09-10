@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLibrary } from "@/lib/library";
 import { formatRelative } from "@/lib/utils";
-import { withProjectCounts } from "@/lib/summary";
+import { projectsWithNotes } from "@/lib/summary";
 
 function parentPath(pathname: string): string | null {
   if (pathname.startsWith("/n/")) return "/notes";
@@ -63,7 +63,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const activeNotes = useMemo(() => notes.filter((n) => !n.archived), [notes]);
   const projectRows = useMemo(
-    () => withProjectCounts(projects, notes),
+    () => projectsWithNotes(projects, notes),
     [projects, notes],
   );
 
@@ -237,7 +237,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
           {!projectRows.length && !newProjectOpen && (
             <p style={{ padding: "8px 12px", fontSize: 13, color: "#8B867C" }}>
-              Create a project, then assign notes to it.
+              Projects appear after you tag a note into one.
             </p>
           )}
           {newProjectOpen ? (

@@ -49,6 +49,7 @@ type LibraryContextValue = {
   refreshProjectSummary: (projectId: string) => Promise<void>;
   importNotes: (notes: Note[]) => Promise<void>;
   importProjects: (projects: Project[]) => Promise<void>;
+  pruneEmptyProjects: (keepProjectId?: string | null) => Promise<number>;
 };
 
 async function mirrorNotesToExtension(notesToPush: Note[]) {
@@ -326,6 +327,20 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
+  const pruneEmptyProjects = useCallback(
+    async (keepProjectId?: string | null) => {
+      const empties = projects.filter((p) => {
+        if (keepProjectId && p.id === keepProjectId) return false;
+        return !notes.some((n) => n.projectId === p.id && !n.archived);
+      });
+      for (const p of empties) {
+        await deleteProject(p.id);
+      }
+      return empties.length;
+    },
+    [projects, notes, deleteProject],
+  );
+
   const value = useMemo(
     () => ({
       notes,
@@ -343,6 +358,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       refreshProjectSummary,
       importNotes,
       importProjects,
+      pruneEmptyProjects,
     }),
     [
       notes,
@@ -360,6 +376,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       refreshProjectSummary,
       importNotes,
       importProjects,
+      pruneEmptyProjects,
     ],
   );
 

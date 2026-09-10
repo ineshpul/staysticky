@@ -28,7 +28,9 @@ export function LibraryPage({
     return active;
   }, [notes, mode]);
 
-  const projectRows = withProjectCounts(projects, notes);
+  const projectRows = withProjectCounts(projects, notes).filter((p) =>
+    filtered.some((n) => n.projectId === p.id),
+  );
   const pages = new Set(filtered.map((n) => n.pageKey)).size;
 
   const title =

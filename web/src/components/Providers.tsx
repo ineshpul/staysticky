@@ -2,13 +2,14 @@
 
 import { AuthProvider } from "@/lib/auth";
 import { LibraryProvider } from "@/lib/library";
-import { ExtensionSync } from "@/components/ExtensionSync";
+import { EmptyProjectPruner, ExtensionSync } from "@/components/ExtensionSync";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
       <LibraryProvider>
         <ExtensionSync />
+        <EmptyProjectPruner />
         {children}
       </LibraryProvider>
     </AuthProvider>
