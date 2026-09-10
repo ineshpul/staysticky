@@ -10,8 +10,19 @@ import { hostnameOf } from "@/lib/utils";
 
 export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const router = useRouter();
-  const { projects, notes, refreshProjectSummary, assignNoteToProject } = useLibrary();
+  const {
+    projects,
+    notes,
+    refreshProjectSummary,
+    assignNoteToProject,
+    renameProject,
+    deleteProject,
+  } = useLibrary();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const project = projects.find((p) => p.id === projectId);
   const { notes: projectNotes, noteCount, sourceCount } = useMemo(
     () => projectStats(notes, projectId),
@@ -19,10 +30,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   );
 
   const addableNotes = useMemo(
-    () =>
-      notes.filter(
-        (n) => !n.archived && n.projectId !== projectId,
-      ),
+    () => notes.filter((n) => !n.archived && n.projectId !== projectId),
     [notes, projectId],
   );
 
@@ -37,6 +45,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     }
   }, [project, projectNotes.length, projectId, refreshProjectSummary]);
 
+  useEffect(() => {
+    if (project) setNameDraft(project.name);
+  }, [project]);
+
   if (!project) {
     return (
       <AppShell>
@@ -44,7 +56,13 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         <button
           type="button"
           onClick={() => router.push("/notes")}
-          style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "#4A463F" }}
+          style={{
+            background: "none",
+            border: "none",
+            textDecoration: "underline",
+            cursor: "pointer",
+            color: "#4A463F",
+          }}
         >
           ← All notes
         </button>
@@ -56,26 +74,143 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [lede, ...rest] = summaryText.split(/\n\n+/);
   const tags = Array.from(new Set([...(project.tags || []), ...draft.tags]));
 
+  async function saveName() {
+    setError("");
+    setBusy(true);
+    try {
+      await renameProject(projectId, nameDraft);
+      setEditingName(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not rename project.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDelete() {
+    if (
+      !window.confirm(
+        `Delete “${project!.name}”? Notes stay in your library but become ungrouped.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await deleteProject(projectId);
+      router.push("/notes");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <AppShell>
       <button
         type="button"
         onClick={() => router.push("/notes")}
-        style={{ fontSize: 13, color: "#6E6A62", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+        style={{
+          fontSize: 13,
+          color: "#6E6A62",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: 0,
+        }}
       >
         ← All notes
       </button>
       <div className="flex flex-wrap items-baseline gap-3" style={{ marginTop: 14 }}>
-        <h1 className="font-display" style={{ margin: 0, fontSize: 38, letterSpacing: "-0.015em" }}>
-          {project.name}
-        </h1>
-        <span className="font-mono" style={{ fontSize: 11, color: "#A29C90", letterSpacing: "0.08em" }}>
-          {noteCount} NOTES · {sourceCount} SOURCES
-        </span>
+        {editingName ? (
+          <div className="flex flex-wrap items-center gap-2" style={{ flex: 1 }}>
+            <input
+              autoFocus
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void saveName();
+                if (e.key === "Escape") {
+                  setEditingName(false);
+                  setNameDraft(project.name);
+                  setError("");
+                }
+              }}
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 32,
+                letterSpacing: "-0.015em",
+                border: "1px solid rgba(31,29,26,.16)",
+                borderRadius: 8,
+                padding: "6px 12px",
+                background: "#FBFAF7",
+                minWidth: 200,
+                maxWidth: "100%",
+              }}
+            />
+            <button
+              type="button"
+              className="btn-dark"
+              disabled={busy}
+              onClick={() => void saveName()}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => {
+                setEditingName(false);
+                setNameDraft(project.name);
+                setError("");
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <>
+            <h1
+              className="font-display"
+              style={{ margin: 0, fontSize: 38, letterSpacing: "-0.015em" }}
+            >
+              {project.name}
+            </h1>
+            <span
+              className="font-mono"
+              style={{ fontSize: 11, color: "#A29C90", letterSpacing: "0.08em" }}
+            >
+              {noteCount} NOTES · {sourceCount} SOURCES
+            </span>
+          </>
+        )}
       </div>
+      <div className="flex flex-wrap gap-2" style={{ marginTop: 12 }}>
+        {!editingName && (
+          <button
+            type="button"
+            className="btn-ghost"
+            style={{ padding: "6px 10px", fontSize: 12.5 }}
+            onClick={() => setEditingName(true)}
+          >
+            Rename
+          </button>
+        )}
+        <button
+          type="button"
+          className="btn-ghost"
+          style={{ padding: "6px 10px", fontSize: 12.5, color: "#8B3A3A" }}
+          disabled={busy}
+          onClick={() => void onDelete()}
+        >
+          Delete project
+        </button>
+      </div>
+      {error && (
+        <p style={{ margin: "8px 0 0", fontSize: 13, color: "#8B3A3A" }}>{error}</p>
+      )}
       <p style={{ margin: "10px 0 34px", fontSize: 14.5, color: "#6E6A62", maxWidth: "60ch" }}>
-        Notes gathered from pages you annotated while reading. Summary below is a free extractive
-        draft from your note text — not a paid AI model.
+        Notes you tagged into this project. Summary below is a free extractive draft from your note
+        text — not a paid AI model.
       </p>
 
       <div
@@ -111,7 +246,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
               }}
             >
               <p style={{ margin: "0 0 10px", fontSize: 13, color: "#6E6A62" }}>
-                Choose notes to move into this project.
+                Choose notes to tag into this project.
               </p>
               {addableNotes.length ? (
                 <div className="flex flex-col gap-1">
@@ -177,7 +312,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           }}
         >
           <div className="flex justify-between gap-3" style={{ marginBottom: 14 }}>
-            <span className="font-mono" style={{ fontSize: 11, color: "#A29C90", letterSpacing: "0.08em" }}>
+            <span
+              className="font-mono"
+              style={{ fontSize: 11, color: "#A29C90", letterSpacing: "0.08em" }}
+            >
               DRAFT SUMMARY
             </span>
             <span className="font-mono" style={{ fontSize: 11, color: "#A29C90" }}>
@@ -188,7 +326,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
             {lede}
           </p>
           {rest.map((p) => (
-            <p key={p.slice(0, 24)} style={{ margin: "0 0 12px", fontSize: 14, lineHeight: 1.6, color: "#3E3A34" }}>
+            <p
+              key={p.slice(0, 24)}
+              style={{ margin: "0 0 12px", fontSize: 14, lineHeight: 1.6, color: "#3E3A34" }}
+            >
               {p}
             </p>
           ))}

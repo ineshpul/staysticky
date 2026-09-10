@@ -37,6 +37,8 @@ type LibraryContextValue = {
   deleteNote: (noteId: string) => Promise<void>;
   upsertProject: (project: Project) => Promise<void>;
   createProject: (name: string) => Promise<Project>;
+  renameProject: (projectId: string, name: string) => Promise<void>;
+  deleteProject: (projectId: string) => Promise<void>;
   assignNoteToProject: (noteId: string, projectId: string | null) => Promise<void>;
   refreshProjectSummary: (projectId: string) => Promise<void>;
   importNotes: (notes: Note[]) => Promise<void>;
@@ -142,6 +144,10 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     async (name: string) => {
       const trimmed = name.trim();
       if (!trimmed) throw new Error("Project name required");
+      const existing = projects.find(
+        (p) => p.name.toLowerCase() === trimmed.toLowerCase(),
+      );
+      if (existing) return existing;
       const project: Project = {
         id: `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
         name: trimmed,
@@ -154,7 +160,44 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       await upsertProject(project);
       return project;
     },
-    [projects.length, upsertProject],
+    [projects, upsertProject],
+  );
+
+  const renameProject = useCallback(
+    async (projectId: string, name: string) => {
+      const project = projects.find((p) => p.id === projectId);
+      const trimmed = name.trim();
+      if (!project || !trimmed) return;
+      const clash = projects.find(
+        (p) => p.id !== projectId && p.name.toLowerCase() === trimmed.toLowerCase(),
+      );
+      if (clash) throw new Error("A project with that name already exists.");
+      await upsertProject({
+        ...project,
+        name: trimmed,
+        updatedAt: Date.now(),
+      });
+    },
+    [projects, upsertProject],
+  );
+
+  const deleteProject = useCallback(
+    async (projectId: string) => {
+      const affected = notes.filter((n) => n.projectId === projectId);
+      for (const note of affected) {
+        await upsertNote({
+          ...note,
+          projectId: null,
+          updatedAt: Date.now(),
+        });
+      }
+      if (!user) {
+        setProjects((prev) => prev.filter((p) => p.id !== projectId));
+        return;
+      }
+      await deleteDoc(doc(getDb(), "users", user.uid, "projects", projectId));
+    },
+    [notes, upsertNote, user],
   );
 
   const assignNoteToProject = useCallback(
@@ -220,6 +263,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       deleteNote,
       upsertProject,
       createProject,
+      renameProject,
+      deleteProject,
       assignNoteToProject,
       refreshProjectSummary,
       importNotes,
@@ -233,6 +278,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       deleteNote,
       upsertProject,
       createProject,
+      renameProject,
+      deleteProject,
       assignNoteToProject,
       refreshProjectSummary,
       importNotes,
