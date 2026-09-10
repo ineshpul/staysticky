@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "./AppShell";
 import { NoteCard } from "./NoteCard";
+import { ProjectCitationsPanel } from "./ProjectCitationsPanel";
 import { ProjectExportMenu } from "./ProjectExportMenu";
 import { useLibrary } from "@/lib/library";
 import { buildExtractiveSummary, projectStats } from "@/lib/summary";
@@ -359,6 +360,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           </div>
         </aside>
       </div>
+
+      <ProjectCitationsPanel projectName={project.name} notes={projectNotes} />
     </AppShell>
   );
 }
