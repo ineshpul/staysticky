@@ -155,6 +155,24 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
     return true;
   }
 
+  if (message?.type === "SS_WEB_DELETE_NOTE") {
+    const noteId = message.noteId;
+    if (!noteId) {
+      sendResponse({ ok: false, message: "Missing noteId." });
+      return false;
+    }
+    getAllNotes()
+      .then(async (notes) => {
+        delete notes[noteId];
+        await setAllNotes(notes);
+        sendResponse({ ok: true, message: "Note deleted.", syncedAt: Date.now() });
+      })
+      .catch((err) => {
+        sendResponse({ ok: false, message: err?.message || "Failed to delete note." });
+      });
+    return true;
+  }
+
   if (message?.type === "SS_WEB_DELETE_PROJECT") {
     const projectId = message.projectId;
     if (!projectId) {

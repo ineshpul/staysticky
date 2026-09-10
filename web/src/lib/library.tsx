@@ -21,6 +21,7 @@ import { useAuth } from "./auth";
 import { getDb } from "./firebase";
 import { DEMO_NOTES, DEMO_PROJECTS } from "./demo-data";
 import {
+  deleteNoteInExtension,
   deleteProjectInExtension,
   getSavedExtensionId,
   isExtensionLinked,
@@ -64,6 +65,13 @@ async function mirrorProjectsToExtension(projectsToPush: Project[]) {
   const extensionId = getSavedExtensionId();
   if (!extensionId || !projectsToPush.length) return;
   await pushProjectsToExtension(extensionId, projectsToPush);
+}
+
+async function mirrorDeleteNoteInExtension(noteId: string) {
+  if (typeof window === "undefined" || !isExtensionLinked()) return;
+  const extensionId = getSavedExtensionId();
+  if (!extensionId) return;
+  await deleteNoteInExtension(extensionId, noteId);
 }
 
 async function mirrorDeleteProjectInExtension(projectId: string) {
@@ -136,9 +144,11 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     async (noteId: string) => {
       if (!user) {
         setNotes((prev) => prev.filter((n) => n.id !== noteId));
+        void mirrorDeleteNoteInExtension(noteId);
         return;
       }
       await deleteDoc(doc(getDb(), "users", user.uid, "notes", noteId));
+      void mirrorDeleteNoteInExtension(noteId);
     },
     [user],
   );

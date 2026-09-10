@@ -255,3 +255,35 @@ export function deleteProjectInExtension(
     }
   });
 }
+
+export function deleteNoteInExtension(
+  extensionId: string,
+  noteId: string,
+): Promise<{ ok: boolean; message: string }> {
+  return new Promise((resolve) => {
+    const runtime = chromeRuntime();
+    if (!runtime?.sendMessage) {
+      resolve({ ok: false, message: "Extension messaging unavailable." });
+      return;
+    }
+    try {
+      runtime.sendMessage(
+        extensionId,
+        { type: "SS_WEB_DELETE_NOTE", noteId },
+        (response) => {
+          const err = runtime.lastError;
+          if (err) {
+            resolve({ ok: false, message: err.message || "Delete failed." });
+            return;
+          }
+          resolve({
+            ok: Boolean(response?.ok),
+            message: response?.message || (response?.ok ? "Deleted." : "Delete failed."),
+          });
+        },
+      );
+    } catch (e) {
+      resolve({ ok: false, message: e instanceof Error ? e.message : "Delete failed." });
+    }
+  });
+}

@@ -10,9 +10,11 @@ import { formatShortDate, hostnameOf } from "@/lib/utils";
 
 export function NoteDetailPage({ noteId }: { noteId: string }) {
   const router = useRouter();
-  const { notes, projects, upsertNote, createProject, assignNoteToProject } = useLibrary();
+  const { notes, projects, upsertNote, createProject, assignNoteToProject, deleteNote } =
+    useLibrary();
   const [creating, setCreating] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const note = notes.find((n) => n.id === noteId);
   const project = projects.find((p) => p.id === note?.projectId);
   const related = notes
@@ -49,6 +51,21 @@ export function NoteDetailPage({ noteId }: { noteId: string }) {
     await assignNoteToProject(note!.id, created.id);
     setNewProjectName("");
     setCreating(false);
+  }
+
+  async function onDelete() {
+    if (!note) return;
+    if (!window.confirm("Delete this note? It will also be removed from the extension.")) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      const back = project ? `/p/${project.id}` : "/notes";
+      await deleteNote(note.id);
+      router.push(back);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -196,6 +213,16 @@ export function NoteDetailPage({ noteId }: { noteId: string }) {
             <div>EDITED {formatShortDate(note.updatedAt)}</div>
             <div>PROJECT {project?.name || "Ungrouped"}</div>
           </div>
+
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={deleting}
+            onClick={() => void onDelete()}
+            style={{ marginTop: 18, color: "#8B3A3A", padding: "8px 12px" }}
+          >
+            {deleting ? "Deleting…" : "Delete note"}
+          </button>
         </section>
 
         <section>
@@ -261,6 +288,15 @@ export function NoteDetailPage({ noteId }: { noteId: string }) {
                   onClick={() => void navigator.clipboard.writeText(note.text || "")}
                 >
                   Copy note
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={deleting}
+                  onClick={() => void onDelete()}
+                  style={{ color: "#8B3A3A" }}
+                >
+                  {deleting ? "Deleting…" : "Delete"}
                 </button>
               </div>
             </div>
