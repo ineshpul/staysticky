@@ -72,13 +72,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
             <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Notes</h2>
             <div style={{ flex: 1, height: 1, background: "rgba(31,29,26,.10)" }} />
           </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))",
-              gap: 20,
-            }}
-          >
+          <div className="note-grid-compact">
             {projectNotes.map((note, i) => (
               <NoteCard key={note.id} note={note} index={i} showDate={false} />
             ))}

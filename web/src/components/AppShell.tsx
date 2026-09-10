@@ -108,7 +108,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Link>
         <button
           type="button"
-          className="md:hidden btn-ghost"
+          className="app-shell-close btn-ghost"
           style={{ padding: "4px 10px" }}
           onClick={() => setDrawerOpen(false)}
         >
@@ -234,19 +234,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="app-shell min-h-screen">
-      <div className="app-shell-sidebar hidden md:block">{sidebar}</div>
+    <div className="app-shell">
+      <div className="app-shell-sidebar-desktop">{sidebar}</div>
       {drawerOpen && (
-        <div className="md:hidden fixed inset-0 z-40" style={{ background: "rgba(31,29,26,.35)" }}>
-          <div className="h-full w-[min(86vw,280px)]" style={{ background: "#F2F0EA" }}>
+        <div
+          className="fixed inset-0 z-40"
+          style={{ background: "rgba(31,29,26,.35)" }}
+          onClick={() => setDrawerOpen(false)}
+        >
+          <div
+            className="h-full w-[min(86vw,280px)]"
+            style={{ background: "#F2F0EA" }}
+            onClick={(e) => e.stopPropagation()}
+          >
             {sidebar}
           </div>
         </div>
       )}
-      <main style={{ padding: "34px clamp(20px,4vw,48px) 60px", minWidth: 0 }}>
+      <main className="app-shell-main">
         <button
           type="button"
-          className="md:hidden btn-ghost mb-4"
+          className="app-shell-menu-btn btn-ghost"
           onClick={() => setDrawerOpen(true)}
         >
           Menu

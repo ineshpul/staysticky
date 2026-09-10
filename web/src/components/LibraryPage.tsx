@@ -76,13 +76,7 @@ export function LibraryPage({
       {empty ? (
         <EmptyNotes />
       ) : mode === "recent" || mode === "archive" ? (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(228px, 1fr))",
-            gap: 22,
-          }}
-        >
+        <div className="note-grid">
           {filtered.map((note, i) => (
             <NoteCard key={note.id} note={note} index={i} />
           ))}
@@ -122,13 +116,7 @@ export function LibraryPage({
                     Open workspace
                   </Link>
                 </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(228px, 1fr))",
-                    gap: 22,
-                  }}
-                >
+                <div className="note-grid">
                   {groupNotes.map((note, i) => (
                     <NoteCard key={note.id} note={note} index={i} />
                   ))}
@@ -139,14 +127,7 @@ export function LibraryPage({
           {filtered.some((n) => !n.projectId) && (
             <section>
               <h2 style={{ fontSize: 15, fontWeight: 600 }}>Ungrouped</h2>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(228px, 1fr))",
-                  gap: 22,
-                  marginTop: 22,
-                }}
-              >
+              <div className="note-grid" style={{ marginTop: 22 }}>
                 {filtered
                   .filter((n) => !n.projectId)
                   .map((note, i) => (
@@ -161,13 +142,7 @@ export function LibraryPage({
           {groupNotesBySite(filtered).map(([site, siteNotes]) => (
             <section key={site}>
               <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 22 }}>{site}</h2>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(228px, 1fr))",
-                  gap: 22,
-                }}
-              >
+              <div className="note-grid">
                 {siteNotes.map((note, i) => (
                   <NoteCard key={note.id} note={note} index={i} />
                 ))}
@@ -180,13 +155,7 @@ export function LibraryPage({
           {groupNotesByDate(filtered).map(([date, dateNotes]) => (
             <section key={date}>
               <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 22 }}>{date}</h2>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(228px, 1fr))",
-                  gap: 22,
-                }}
-              >
+              <div className="note-grid">
                 {dateNotes.map((note, i) => (
                   <NoteCard key={note.id} note={note} index={i} />
                 ))}
