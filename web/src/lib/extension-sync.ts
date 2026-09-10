@@ -1,4 +1,4 @@
-import type { Note } from "./types";
+import type { Note, Project } from "./types";
 
 const EXT_ID_KEY = "ss_extension_id";
 const LINKED_KEY = "ss_extension_linked";
@@ -53,6 +53,18 @@ export function normalizeExtensionNote(n: Record<string, unknown>): Note {
   };
 }
 
+export function normalizeExtensionProject(p: Record<string, unknown>): Project {
+  return {
+    id: String(p.id),
+    name: String(p.name || "Untitled"),
+    color: String(p.color || "#FFF59D"),
+    summary: (p.summary as string) || null,
+    tags: Array.isArray(p.tags) ? (p.tags as string[]) : [],
+    createdAt: Number(p.createdAt) || Date.now(),
+    updatedAt: Number(p.updatedAt) || Date.now(),
+  };
+}
+
 export function mergeIncomingNote(existing: Note | undefined, incoming: Note): Note {
   if (!existing) return incoming;
   if (incoming.updatedAt > existing.updatedAt) {
@@ -65,15 +77,27 @@ export function mergeIncomingNote(existing: Note | undefined, incoming: Note): N
   }
   return {
     ...existing,
-    // Prefer fresher text fields only when incoming is newer — already handled.
-    // Keep cloud project assignment when extension note is older/missing it.
     projectId: existing.projectId ?? incoming.projectId,
   };
 }
 
-export function fetchNotesFromExtension(
-  extensionId: string,
-): Promise<{ ok: boolean; message: string; notes: Note[] }> {
+export function mergeIncomingProject(
+  existing: Project | undefined,
+  incoming: Project,
+): Project {
+  if (!existing) return incoming;
+  if (incoming.updatedAt >= existing.updatedAt) {
+    return { ...existing, ...incoming };
+  }
+  return existing;
+}
+
+export function fetchFromExtension(extensionId: string): Promise<{
+  ok: boolean;
+  message: string;
+  notes: Note[];
+  projects: Project[];
+}> {
   return new Promise((resolve) => {
     const runtime = chromeRuntime();
     if (!runtime?.sendMessage) {
@@ -81,6 +105,7 @@ export function fetchNotesFromExtension(
         ok: false,
         message: "Open this site in Chrome with Stay Sticky installed.",
         notes: [],
+        projects: [],
       });
       return;
     }
@@ -88,14 +113,23 @@ export function fetchNotesFromExtension(
       runtime.sendMessage(extensionId, { type: "SS_WEB_GET_NOTES" }, (response) => {
         const err = runtime.lastError;
         if (err) {
-          resolve({ ok: false, message: err.message || "Extension not reachable.", notes: [] });
+          resolve({
+            ok: false,
+            message: err.message || "Extension not reachable.",
+            notes: [],
+            projects: [],
+          });
           return;
         }
-        const raw = Array.isArray(response?.notes) ? response.notes : [];
+        const rawNotes = Array.isArray(response?.notes) ? response.notes : [];
+        const rawProjects = Array.isArray(response?.projects) ? response.projects : [];
         resolve({
           ok: Boolean(response?.ok),
           message: response?.message || "Synced.",
-          notes: raw.map((n: Record<string, unknown>) => normalizeExtensionNote(n)),
+          notes: rawNotes.map((n: Record<string, unknown>) => normalizeExtensionNote(n)),
+          projects: rawProjects.map((p: Record<string, unknown>) =>
+            normalizeExtensionProject(p),
+          ),
         });
       });
     } catch (e) {
@@ -103,9 +137,15 @@ export function fetchNotesFromExtension(
         ok: false,
         message: e instanceof Error ? e.message : "Sync failed.",
         notes: [],
+        projects: [],
       });
     }
   });
+}
+
+/** @deprecated use fetchFromExtension */
+export function fetchNotesFromExtension(extensionId: string) {
+  return fetchFromExtension(extensionId);
 }
 
 export function pushNotesToExtension(
@@ -136,6 +176,70 @@ export function pushNotesToExtension(
       );
     } catch (e) {
       resolve({ ok: false, message: e instanceof Error ? e.message : "Push failed." });
+    }
+  });
+}
+
+export function pushProjectsToExtension(
+  extensionId: string,
+  projects: Project[],
+): Promise<{ ok: boolean; message: string }> {
+  return new Promise((resolve) => {
+    const runtime = chromeRuntime();
+    if (!runtime?.sendMessage) {
+      resolve({ ok: false, message: "Extension messaging unavailable." });
+      return;
+    }
+    try {
+      runtime.sendMessage(
+        extensionId,
+        { type: "SS_WEB_UPSERT_PROJECTS", projects },
+        (response) => {
+          const err = runtime.lastError;
+          if (err) {
+            resolve({ ok: false, message: err.message || "Push failed." });
+            return;
+          }
+          resolve({
+            ok: Boolean(response?.ok),
+            message: response?.message || (response?.ok ? "Pushed." : "Push failed."),
+          });
+        },
+      );
+    } catch (e) {
+      resolve({ ok: false, message: e instanceof Error ? e.message : "Push failed." });
+    }
+  });
+}
+
+export function deleteProjectInExtension(
+  extensionId: string,
+  projectId: string,
+): Promise<{ ok: boolean; message: string }> {
+  return new Promise((resolve) => {
+    const runtime = chromeRuntime();
+    if (!runtime?.sendMessage) {
+      resolve({ ok: false, message: "Extension messaging unavailable." });
+      return;
+    }
+    try {
+      runtime.sendMessage(
+        extensionId,
+        { type: "SS_WEB_DELETE_PROJECT", projectId },
+        (response) => {
+          const err = runtime.lastError;
+          if (err) {
+            resolve({ ok: false, message: err.message || "Delete failed." });
+            return;
+          }
+          resolve({
+            ok: Boolean(response?.ok),
+            message: response?.message || (response?.ok ? "Deleted." : "Delete failed."),
+          });
+        },
+      );
+    } catch (e) {
+      resolve({ ok: false, message: e instanceof Error ? e.message : "Delete failed." });
     }
   });
 }

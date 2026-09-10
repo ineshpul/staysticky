@@ -91,7 +91,7 @@ body {
 
 .ss-note-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   padding: 6px 4px;
   border-radius: 6px;
@@ -108,6 +108,15 @@ body {
   border-radius: 50%;
   flex-shrink: 0;
   border: 1px solid rgba(0, 0, 0, 0.15);
+  margin-top: 4px;
+}
+
+.ss-note-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .ss-note-snippet {
@@ -122,6 +131,80 @@ body {
   -webkit-box-orient: vertical;
 }
 
+.ss-note-project-select {
+  width: 100%;
+  font-size: 11px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  padding: 3px 4px;
+  background: #fff;
+  color: #444;
+}
+
+.ss-projects {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.ss-project-create {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ss-project-create input {
+  flex: 1;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.ss-secondary-btn {
+  border: none;
+  background: #2b2b2b;
+  color: #fff;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ss-project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ss-project-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #333;
+  padding: 2px 0;
+}
+
+.ss-project-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+
+.ss-project-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ss-empty-inline {
+  margin: 0;
+  font-size: 12px;
+  color: #777;
+}
+
 .ss-note-item-delete {
   background: transparent;
   border: none;
@@ -130,6 +213,7 @@ body {
   font-size: 12px;
   padding: 2px 4px;
   flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .ss-note-item-delete:hover {

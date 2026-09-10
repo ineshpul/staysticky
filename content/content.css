@@ -44,6 +44,23 @@
   cursor: grabbing;
 }
 
+.ss-note-project-row {
+  padding: 4px 8px 0;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.ss-note-project {
+  width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  padding: 3px 4px;
+  color: #2b2b2b;
+  outline: none;
+  cursor: pointer;
+}
+
 .ss-note-colors {
   display: flex;
   gap: 5px;

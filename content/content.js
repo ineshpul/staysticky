@@ -61,13 +61,56 @@
           '<button class="ss-note-delete" title="Delete note">✕</button>' +
         '</div>' +
       '</div>' +
+      '<div class="ss-note-project-row">' +
+        '<select class="ss-note-project" title="Tag with a project" aria-label="Project">' +
+          '<option value="">No project</option>' +
+        '</select>' +
+      '</div>' +
       `<textarea class="ss-note-text" placeholder="Write a note...">${ssEscapeHtml(note.text || '')}</textarea>` +
       '<div class="ss-note-resize" title="Drag to resize"></div>';
 
     document.body.appendChild(el);
     notesOnPage[note.id] = el;
     wireCardEvents(el, note);
+    refreshProjectSelect(el, note);
     return el;
+  }
+
+  function refreshProjectSelect(el, note) {
+    const select = el.querySelector('.ss-note-project');
+    if (!select) return;
+    ssGetAllProjects((projects) => {
+      const current = note.projectId || '';
+      select.innerHTML = '<option value="">No project</option>';
+      ssSortedProjects(projects).forEach((p) => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        if (p.id === current) opt.selected = true;
+        select.appendChild(opt);
+      });
+      const createOpt = document.createElement('option');
+      createOpt.value = '__new__';
+      createOpt.textContent = '+ New project…';
+      select.appendChild(createOpt);
+      if (current && !projects[current]) {
+        select.value = '';
+      } else {
+        select.value = current;
+      }
+    });
+  }
+
+  function refreshAllProjectSelects() {
+    Object.keys(notesOnPage).forEach((id) => {
+      const el = notesOnPage[id];
+      const noteId = el?.dataset?.noteId;
+      if (!noteId) return;
+      ssGetAllNotes((notes) => {
+        const note = notes[noteId];
+        if (note) refreshProjectSelect(el, note);
+      });
+    });
   }
 
   function wireCardEvents(el, note) {
@@ -80,7 +123,7 @@
     let offsetY = 0;
 
     handle.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('button')) return;
+      if (e.target.closest('button') || e.target.closest('select')) return;
       dragging = true;
       offsetX = e.pageX - el.offsetLeft;
       offsetY = e.pageY - el.offsetTop;
@@ -155,6 +198,35 @@
       });
     });
 
+    const projectSelect = el.querySelector('.ss-note-project');
+    if (projectSelect) {
+      projectSelect.addEventListener('pointerdown', (e) => e.stopPropagation());
+      projectSelect.addEventListener('click', (e) => e.stopPropagation());
+      projectSelect.addEventListener('change', () => {
+        const value = projectSelect.value;
+        if (value === '__new__') {
+          const name = window.prompt('New project name');
+          if (!name || !name.trim()) {
+            projectSelect.value = note.projectId || '';
+            return;
+          }
+          ssCreateProject(name, (project) => {
+            if (!project) {
+              projectSelect.value = note.projectId || '';
+              return;
+            }
+            note.projectId = project.id;
+            note.updatedAt = Date.now();
+            ssSaveNote(note, () => refreshProjectSelect(el, note));
+          });
+          return;
+        }
+        note.projectId = value || null;
+        note.updatedAt = Date.now();
+        ssSaveNote(note);
+      });
+    }
+
     el.querySelector('.ss-note-delete').addEventListener('click', () => {
       el.remove();
       delete notesOnPage[note.id];
@@ -225,6 +297,9 @@
       minimized: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      projectId: null,
+      tags: [],
+      archived: false,
     };
     ssSaveNote(note, () => {
       const el = renderCard(note);
@@ -249,14 +324,22 @@
 
   // Keep this page's notes in sync if they're edited/deleted from the popup bank.
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local' || !changes.notes) return;
+    if (area !== 'local') return;
+
+    if (changes.projects) {
+      refreshAllProjectSelects();
+    }
+
+    if (!changes.notes) return;
     const newNotes = changes.notes.newValue || {};
 
     Object.keys(notesOnPage).forEach((id) => {
       if (!newNotes[id]) {
         notesOnPage[id].remove();
         delete notesOnPage[id];
+        return;
       }
+      refreshProjectSelect(notesOnPage[id], newNotes[id]);
     });
     Object.keys(minimizedChips).forEach((id) => {
       if (!newNotes[id]) {

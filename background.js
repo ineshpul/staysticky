@@ -1,5 +1,5 @@
 // Stay Sticky background service worker.
-// Bridges chrome.storage.local notes with the companion web app (Vercel)
+// Bridges chrome.storage.local notes/projects with the companion web app
 // via chrome.runtime external messaging.
 
 function getAllNotes() {
@@ -16,6 +16,20 @@ function setAllNotes(notes) {
   });
 }
 
+function getAllProjects() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get({ projects: {} }, (data) => {
+      resolve(data.projects || {});
+    });
+  });
+}
+
+function setAllProjects(projects) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ projects }, () => resolve());
+  });
+}
+
 function notesArray(notesMap) {
   return Object.values(notesMap || {}).map((note) => ({
     ...note,
@@ -24,6 +38,18 @@ function notesArray(notesMap) {
     archived: Boolean(note.archived),
     anchorText: note.anchorText || null,
     snapshotUrl: note.snapshotUrl || null,
+  }));
+}
+
+function projectsArray(projectsMap) {
+  return Object.values(projectsMap || {}).map((project) => ({
+    id: project.id,
+    name: project.name || "Untitled",
+    color: project.color || "#FFF59D",
+    summary: project.summary || null,
+    tags: Array.isArray(project.tags) ? project.tags : [],
+    createdAt: Number(project.createdAt) || Date.now(),
+    updatedAt: Number(project.updatedAt) || Date.now(),
   }));
 }
 
@@ -44,12 +70,13 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
   }
 
   if (message?.type === "SS_WEB_GET_NOTES" || message?.type === "SS_WEB_REQUEST_SYNC") {
-    getAllNotes()
-      .then((notes) => {
+    Promise.all([getAllNotes(), getAllProjects()])
+      .then(([notes, projects]) => {
         sendResponse({
           ok: true,
-          message: "Notes loaded from extension storage.",
+          message: "Notes and projects loaded from extension storage.",
           notes: notesArray(notes),
+          projects: projectsArray(projects),
           syncedAt: Date.now(),
         });
       })
@@ -94,8 +121,64 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
     return true;
   }
 
+  if (message?.type === "SS_WEB_UPSERT_PROJECTS") {
+    const incoming = Array.isArray(message.projects) ? message.projects : [];
+    getAllProjects()
+      .then(async (projects) => {
+        for (const p of incoming) {
+          if (!p || !p.id) continue;
+          const existing = projects[p.id] || {};
+          const incomingUpdated = Number(p.updatedAt) || 0;
+          const existingUpdated = Number(existing.updatedAt) || 0;
+          if (!existing.id || incomingUpdated >= existingUpdated) {
+            projects[p.id] = {
+              ...existing,
+              ...p,
+              id: p.id,
+              name: p.name || existing.name || "Untitled",
+              tags: Array.isArray(p.tags) ? p.tags : existing.tags || [],
+            };
+          }
+        }
+        await setAllProjects(projects);
+        sendResponse({
+          ok: true,
+          message: `Updated ${incoming.length} project(s).`,
+          syncedAt: Date.now(),
+        });
+      })
+      .catch((err) => {
+        sendResponse({ ok: false, message: err?.message || "Failed to write projects." });
+      });
+    return true;
+  }
+
+  if (message?.type === "SS_WEB_DELETE_PROJECT") {
+    const projectId = message.projectId;
+    if (!projectId) {
+      sendResponse({ ok: false, message: "Missing projectId." });
+      return false;
+    }
+    Promise.all([getAllProjects(), getAllNotes()])
+      .then(async ([projects, notes]) => {
+        delete projects[projectId];
+        for (const id of Object.keys(notes)) {
+          if (notes[id].projectId === projectId) {
+            notes[id] = { ...notes[id], projectId: null, updatedAt: Date.now() };
+          }
+        }
+        await setAllProjects(projects);
+        await setAllNotes(notes);
+        sendResponse({ ok: true, message: "Project deleted.", syncedAt: Date.now() });
+      })
+      .catch((err) => {
+        sendResponse({ ok: false, message: err?.message || "Failed to delete project." });
+      });
+    return true;
+  }
+
   if (message?.type === "SS_WEB_PING") {
-    sendResponse({ ok: true, message: "Stay Sticky extension online.", version: "1.1.0" });
+    sendResponse({ ok: true, message: "Stay Sticky extension online.", version: "1.2.0" });
     return false;
   }
 

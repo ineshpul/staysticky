@@ -21,9 +21,11 @@ import { useAuth } from "./auth";
 import { getDb } from "./firebase";
 import { DEMO_NOTES, DEMO_PROJECTS } from "./demo-data";
 import {
+  deleteProjectInExtension,
   getSavedExtensionId,
   isExtensionLinked,
   pushNotesToExtension,
+  pushProjectsToExtension,
 } from "./extension-sync";
 import { buildExtractiveSummary } from "./summary";
 import { NOTE_COLORS, type Note, type Project } from "./types";
@@ -42,6 +44,7 @@ type LibraryContextValue = {
   assignNoteToProject: (noteId: string, projectId: string | null) => Promise<void>;
   refreshProjectSummary: (projectId: string) => Promise<void>;
   importNotes: (notes: Note[]) => Promise<void>;
+  importProjects: (projects: Project[]) => Promise<void>;
 };
 
 async function mirrorNotesToExtension(notesToPush: Note[]) {
@@ -49,6 +52,20 @@ async function mirrorNotesToExtension(notesToPush: Note[]) {
   const extensionId = getSavedExtensionId();
   if (!extensionId || !notesToPush.length) return;
   await pushNotesToExtension(extensionId, notesToPush);
+}
+
+async function mirrorProjectsToExtension(projectsToPush: Project[]) {
+  if (typeof window === "undefined" || !isExtensionLinked()) return;
+  const extensionId = getSavedExtensionId();
+  if (!extensionId || !projectsToPush.length) return;
+  await pushProjectsToExtension(extensionId, projectsToPush);
+}
+
+async function mirrorDeleteProjectInExtension(projectId: string) {
+  if (typeof window === "undefined" || !isExtensionLinked()) return;
+  const extensionId = getSavedExtensionId();
+  if (!extensionId) return;
+  await deleteProjectInExtension(extensionId, projectId);
 }
 
 const LibraryContext = createContext<LibraryContextValue | null>(null);
@@ -131,11 +148,13 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           copy[i] = project;
           return copy;
         });
+        void mirrorProjectsToExtension([project]);
         return;
       }
       await setDoc(doc(getDb(), "users", user.uid, "projects", project.id), project, {
         merge: true,
       });
+      void mirrorProjectsToExtension([project]);
     },
     [user],
   );
@@ -193,9 +212,11 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       }
       if (!user) {
         setProjects((prev) => prev.filter((p) => p.id !== projectId));
+        void mirrorDeleteProjectInExtension(projectId);
         return;
       }
       await deleteDoc(doc(getDb(), "users", user.uid, "projects", projectId));
+      void mirrorDeleteProjectInExtension(projectId);
     },
     [notes, upsertNote, user],
   );
@@ -253,6 +274,32 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
+  const importProjects = useCallback(
+    async (incoming: Project[]) => {
+      if (!incoming.length) return;
+      if (!user) {
+        setProjects((prev) => {
+          const map = new Map(prev.map((p) => [p.id, p]));
+          for (const p of incoming) {
+            const existing = map.get(p.id);
+            if (!existing || p.updatedAt >= existing.updatedAt) map.set(p.id, p);
+          }
+          return [...map.values()];
+        });
+        return;
+      }
+      const db = getDb();
+      const batch = writeBatch(db);
+      for (const project of incoming) {
+        batch.set(doc(db, "users", user.uid, "projects", project.id), project, {
+          merge: true,
+        });
+      }
+      await batch.commit();
+    },
+    [user],
+  );
+
   const value = useMemo(
     () => ({
       notes,
@@ -268,6 +315,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       assignNoteToProject,
       refreshProjectSummary,
       importNotes,
+      importProjects,
     }),
     [
       notes,
@@ -283,6 +331,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       assignNoteToProject,
       refreshProjectSummary,
       importNotes,
+      importProjects,
     ],
   );
 

@@ -4,10 +4,12 @@ import { useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLibrary } from "@/lib/library";
 import {
-  fetchNotesFromExtension,
+  fetchFromExtension,
   getSavedExtensionId,
   isExtensionLinked,
   mergeIncomingNote,
+  mergeIncomingProject,
+  pushProjectsToExtension,
 } from "@/lib/extension-sync";
 
 const POLL_MS = 15000;
@@ -16,9 +18,11 @@ const POLL_MS = 15000;
  *  Does not invent projects — notes stay ungrouped until tagged explicitly. */
 export function ExtensionSync() {
   const { user, profile } = useAuth();
-  const { notes, importNotes } = useLibrary();
+  const { notes, projects, importNotes, importProjects } = useLibrary();
   const notesRef = useRef(notes);
+  const projectsRef = useRef(projects);
   notesRef.current = notes;
+  projectsRef.current = projects;
 
   useEffect(() => {
     if (!user) return;
@@ -31,14 +35,29 @@ export function ExtensionSync() {
     let cancelled = false;
 
     async function pull() {
-      const res = await fetchNotesFromExtension(extensionId);
+      const res = await fetchFromExtension(extensionId);
       if (cancelled || !res.ok) return;
 
-      const cloudById = new Map(notesRef.current.map((n) => [n.id, n]));
-      const merged = res.notes.map((incoming) =>
-        mergeIncomingNote(cloudById.get(incoming.id), incoming),
+      const cloudNotes = new Map(notesRef.current.map((n) => [n.id, n]));
+      const mergedNotes = res.notes.map((incoming) =>
+        mergeIncomingNote(cloudNotes.get(incoming.id), incoming),
       );
-      await importNotes(merged);
+
+      const byId = new Map(projectsRef.current.map((p) => [p.id, p]));
+      for (const incoming of res.projects) {
+        byId.set(incoming.id, mergeIncomingProject(byId.get(incoming.id), incoming));
+      }
+      const mergedProjects = [...byId.values()];
+
+      if (mergedProjects.length) {
+        await importProjects(mergedProjects);
+      }
+      // Keep extension project list aligned with the library.
+      if (projectsRef.current.length) {
+        await pushProjectsToExtension(extensionId, projectsRef.current);
+      }
+
+      await importNotes(mergedNotes);
     }
 
     void pull();
@@ -56,7 +75,7 @@ export function ExtensionSync() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [user, profile?.settings.syncEnabled, importNotes]);
+  }, [user, profile?.settings.syncEnabled, importNotes, importProjects]);
 
   return null;
 }

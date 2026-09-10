@@ -5,17 +5,18 @@ import { AppShell } from "./AppShell";
 import { useAuth } from "@/lib/auth";
 import { useLibrary } from "@/lib/library";
 import {
-  clearExtensionLink,
-  fetchNotesFromExtension,
+  fetchFromExtension,
   getSavedExtensionId,
   isExtensionLinked,
   mergeIncomingNote,
+  mergeIncomingProject,
   saveExtensionLink,
+  clearExtensionLink,
 } from "@/lib/extension-sync";
 
 export function AccountPage() {
   const { user, profile, signIn, signOut, updateSettings } = useAuth();
-  const { notes, usingDemo, lastSyncedAt, importNotes } = useLibrary();
+  const { notes, usingDemo, lastSyncedAt, importNotes, importProjects } = useLibrary();
   const [extensionId, setExtensionId] = useState("");
   const [status, setStatus] = useState("");
   const [linked, setLinked] = useState(false);
@@ -49,7 +50,7 @@ export function AccountPage() {
     setStatus("Connecting…");
     try {
       const id = extensionId.trim();
-      const res = await fetchNotesFromExtension(id);
+      const res = await fetchFromExtension(id);
       setLinked(res.ok);
       if (!res.ok) {
         setStatus(res.message);
@@ -63,6 +64,11 @@ export function AccountPage() {
       const merged = res.notes.map((incoming) =>
         mergeIncomingNote(cloudById.get(incoming.id), incoming),
       );
+      if (res.projects.length) {
+        await importProjects(
+          res.projects.map((incoming) => mergeIncomingProject(undefined, incoming)),
+        );
+      }
       await importNotes(merged);
       setStatus(
         `Linked permanently. Imported ${merged.length} notes — Stay Sticky will keep syncing automatically.`,
@@ -111,7 +117,7 @@ export function AccountPage() {
           <div className="min-w-0 flex-1">
             <div style={{ fontSize: 14.5, fontWeight: 600 }}>Stay Sticky for Chrome</div>
             <div className="font-mono" style={{ fontSize: 11, color: "#8B867C", marginTop: 4 }}>
-              v1.1.0 · {linked ? "auto-sync on" : "not linked"} ·{" "}
+              v1.2.0 · {linked ? "auto-sync on" : "not linked"} ·{" "}
               {lastSyncedAt
                 ? `last sync ${new Date(lastSyncedAt).toLocaleTimeString()}`
                 : usingDemo
