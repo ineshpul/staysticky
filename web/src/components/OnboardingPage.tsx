@@ -88,7 +88,22 @@ export function OnboardingPage() {
     return (
       <div className="marketing-wrap" style={{ minHeight: "70vh" }}>
         <LandingHeader />
-        <p style={{ marginTop: 48, color: "#6E6A62" }}>Preparing setup…</p>
+        <button
+          type="button"
+          onClick={() => router.push("/")}
+          style={{
+            margin: "36px 0 0",
+            padding: 0,
+            border: "none",
+            background: "none",
+            color: "#6E6A62",
+            fontSize: 13,
+            cursor: "pointer",
+          }}
+        >
+          ← Back
+        </button>
+        <p style={{ marginTop: 16, color: "#6E6A62" }}>Preparing setup…</p>
       </div>
     );
   }
@@ -97,10 +112,37 @@ export function OnboardingPage() {
     <div className="marketing-wrap" style={{ maxWidth: 720 }}>
       <LandingHeader />
 
+      <button
+        type="button"
+        onClick={() => {
+          if (step === 3 && installedAck && !linked) {
+            setInstalledAck(false);
+            setStatus("");
+            return;
+          }
+          if (step === 2 && typeof window !== "undefined" && window.history.length > 1) {
+            router.back();
+            return;
+          }
+          router.push("/");
+        }}
+        style={{
+          margin: "36px 0 0",
+          padding: 0,
+          border: "none",
+          background: "none",
+          color: "#6E6A62",
+          fontSize: 13,
+          cursor: "pointer",
+        }}
+      >
+        ← Back
+      </button>
+
       <p
         className="font-mono"
         style={{
-          margin: "48px 0 12px",
+          margin: "14px 0 12px",
           fontSize: 12,
           letterSpacing: "0.08em",
           textTransform: "uppercase",
