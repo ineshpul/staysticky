@@ -1,0 +1,160 @@
+.ss-sticky-note {
+  position: absolute;
+  z-index: 2147483647;
+  min-width: 160px;
+  min-height: 120px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28), 0 1px 3px rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ss-note-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(
+    135deg,
+    transparent 0 45%,
+    rgba(0, 0, 0, 0.35) 45% 55%,
+    transparent 55% 65%,
+    rgba(0, 0, 0, 0.35) 65% 75%,
+    transparent 75% 100%
+  );
+}
+
+.ss-note-handle {
+  cursor: grab;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.08);
+  touch-action: none;
+  user-select: none;
+}
+
+.ss-note-handle:active {
+  cursor: grabbing;
+}
+
+.ss-note-colors {
+  display: flex;
+  gap: 5px;
+}
+
+.ss-color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  padding: 0;
+}
+
+.ss-note-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.ss-note-actions button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 5px;
+  line-height: 1;
+  border-radius: 3px;
+}
+
+.ss-note-minimize {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.ss-note-actions button:hover {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.ss-note-text {
+  flex: 1;
+  resize: none;
+  border: none;
+  background: transparent;
+  padding: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  outline: none;
+  font-family: inherit;
+  color: #2b2b2b;
+}
+
+.ss-note-text::placeholder {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.ss-tray {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  align-items: flex-end;
+}
+
+.ss-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 200px;
+  padding: 6px 8px;
+  background: #fffde7;
+  border-radius: 16px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+}
+
+.ss-chip:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.32);
+}
+
+.ss-chip-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.ss-chip-text {
+  font-size: 12px;
+  color: #2b2b2b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ss-chip-delete {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.4);
+  font-size: 11px;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.ss-chip-delete:hover {
+  color: #c62828;
+}
