@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AppShell } from "./AppShell";
 import { useLibrary } from "@/lib/library";
 import { NOTE_COLORS } from "@/lib/types";
 import { formatShortDate, hostnameOf } from "@/lib/utils";
 
 export function NoteDetailPage({ noteId }: { noteId: string }) {
+  const router = useRouter();
   const { notes, projects, upsertNote } = useLibrary();
   const note = notes.find((n) => n.id === noteId);
   const project = projects.find((p) => p.id === note?.projectId);
@@ -18,19 +20,26 @@ export function NoteDetailPage({ noteId }: { noteId: string }) {
     return (
       <AppShell>
         <p style={{ color: "#6E6A62" }}>Note not found.</p>
-        <Link href="/notes">← All notes</Link>
+        <button
+          type="button"
+          onClick={() => router.push("/notes")}
+          style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer" }}
+        >
+          ← All notes
+        </button>
       </AppShell>
     );
   }
 
   return (
     <AppShell>
-      <Link
-        href={project ? `/p/${project.id}` : "/notes"}
-        style={{ fontSize: 13, color: "#6E6A62" }}
+      <button
+        type="button"
+        onClick={() => router.push(project ? `/p/${project.id}` : "/notes")}
+        style={{ fontSize: 13, color: "#6E6A62", background: "none", border: "none", cursor: "pointer", padding: 0 }}
       >
         ← {project?.name || "All notes"}
-      </Link>
+      </button>
 
       <div
         style={{

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
 import { AppShell } from "./AppShell";
 import { NoteCard } from "./NoteCard";
@@ -8,6 +8,7 @@ import { useLibrary } from "@/lib/library";
 import { buildExtractiveSummary, projectStats } from "@/lib/summary";
 
 export function ProjectWorkspace({ projectId }: { projectId: string }) {
+  const router = useRouter();
   const { projects, notes, refreshProjectSummary } = useLibrary();
   const project = projects.find((p) => p.id === projectId);
   const { notes: projectNotes, noteCount, sourceCount } = useMemo(
@@ -30,9 +31,13 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     return (
       <AppShell>
         <p style={{ color: "#6E6A62" }}>Project not found.</p>
-        <Link href="/notes" style={{ textDecoration: "underline" }}>
+        <button
+          type="button"
+          onClick={() => router.push("/notes")}
+          style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", color: "#4A463F" }}
+        >
           ← All notes
-        </Link>
+        </button>
       </AppShell>
     );
   }
@@ -43,9 +48,13 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   return (
     <AppShell>
-      <Link href="/notes" style={{ fontSize: 13, color: "#6E6A62" }}>
+      <button
+        type="button"
+        onClick={() => router.push("/notes")}
+        style={{ fontSize: 13, color: "#6E6A62", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+      >
         ← All notes
-      </Link>
+      </button>
       <div className="flex flex-wrap items-baseline gap-3" style={{ marginTop: 14 }}>
         <h1 className="font-display" style={{ margin: 0, fontSize: 38, letterSpacing: "-0.015em" }}>
           {project.name}

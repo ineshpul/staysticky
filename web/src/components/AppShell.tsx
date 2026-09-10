@@ -1,12 +1,20 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLibrary } from "@/lib/library";
 import { formatRelative } from "@/lib/utils";
 import { withProjectCounts } from "@/lib/summary";
+
+function parentPath(pathname: string): string | null {
+  if (pathname.startsWith("/n/")) return "/notes";
+  if (pathname.startsWith("/p/")) return "/notes";
+  if (pathname === "/search" || pathname === "/account") return "/notes";
+  if (pathname === "/notes/recent" || pathname === "/notes/archive") return "/notes";
+  if (pathname === "/how-it-works") return "/";
+  return null;
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -14,7 +22,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signIn } = useAuth();
   const { notes, projects, usingDemo, lastSyncedAt } = useLibrary();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(true);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  const go = useCallback(
+    (href: string) => {
+      setDrawerOpen(false);
+      if (pathname !== href) router.push(href);
+    },
+    [pathname, router],
+  );
+
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 901px)");
@@ -31,12 +51,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        router.push("/search");
+        go("/search");
       }
+      if (e.key === "Escape") setDrawerOpen(false);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [router]);
+  }, [go]);
 
   const activeNotes = useMemo(() => notes.filter((n) => !n.archived), [notes]);
   const projectRows = useMemo(
@@ -50,6 +71,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
+  const backTo = parentPath(pathname);
 
   if (loading) {
     return (
@@ -70,24 +93,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const navItem = (href: string, label: string, count?: number) => {
-    const active = pathname === href || (href !== "/notes" && pathname.startsWith(href));
+    const active =
+      href === "/notes" ? pathname === "/notes" : pathname === href || pathname.startsWith(`${href}/`);
     return (
-      <Link
-        href={href}
-        onClick={() => setDrawerOpen(false)}
-        className="flex items-center justify-between"
+      <button
+        type="button"
+        onClick={() => go(href)}
+        className="flex w-full items-center justify-between text-left"
         style={{
           fontSize: 13.5,
           padding: "8px 12px",
           borderRadius: 8,
+          border: "none",
+          cursor: "pointer",
           fontWeight: active ? 600 : 400,
           background: active ? "rgba(31,29,26,.08)" : "transparent",
-        }}
-        onMouseEnter={(e) => {
-          if (!active) e.currentTarget.style.background = "rgba(31,29,26,.05)";
-        }}
-        onMouseLeave={(e) => {
-          if (!active) e.currentTarget.style.background = active ? "rgba(31,29,26,.08)" : "transparent";
+          color: "#1F1D1A",
         }}
       >
         <span>{label}</span>
@@ -96,7 +117,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {count}
           </span>
         )}
-      </Link>
+      </button>
     );
   };
 
@@ -114,14 +135,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       }}
     >
       <div className="flex items-center justify-between gap-3">
-        <Link href="/notes" onClick={() => setDrawerOpen(false)}>
+        <button
+          type="button"
+          onClick={() => go("/notes")}
+          style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer" }}
+          aria-label="Stay Sticky home"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/staysticky-logo-lockup.png" alt="Stay Sticky" style={{ height: 34 }} />
-        </Link>
+        </button>
         {!isDesktop && (
           <button
             type="button"
-            className="app-shell-close btn-ghost"
+            className="btn-ghost"
             style={{ padding: "4px 10px" }}
             onClick={() => setDrawerOpen(false)}
           >
@@ -132,10 +158,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <button
         type="button"
-        onClick={() => {
-          setDrawerOpen(false);
-          router.push("/search");
-        }}
+        onClick={() => go("/search")}
         className="flex w-full items-center justify-between"
         style={{
           background: "#FBFAF7",
@@ -174,36 +197,42 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           Projects
         </div>
         <div className="flex flex-col gap-1">
-          {projectRows.map((p) => (
-            <Link
-              key={p.id}
-              href={`/p/${p.id}`}
-              onClick={() => setDrawerOpen(false)}
-              className="flex items-center gap-2"
-              style={{
-                padding: "8px 12px",
-                borderRadius: 8,
-                fontSize: 13.5,
-                background: pathname === `/p/${p.id}` ? "rgba(31,29,26,.08)" : "transparent",
-                fontWeight: pathname === `/p/${p.id}` ? 600 : 400,
-              }}
-            >
-              <span
+          {projectRows.map((p) => {
+            const active = pathname === `/p/${p.id}`;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => go(`/p/${p.id}`)}
+                className="flex w-full items-center gap-2 text-left"
                 style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 999,
-                  background: p.color,
-                  border: "1px solid rgba(31,29,26,.2)",
-                  flexShrink: 0,
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 13.5,
+                  background: active ? "rgba(31,29,26,.08)" : "transparent",
+                  fontWeight: active ? 600 : 400,
+                  color: "#1F1D1A",
                 }}
-              />
-              <span className="truncate flex-1">{p.name}</span>
-              <span className="font-mono" style={{ fontSize: 11, color: "#A29C90" }}>
-                {p.noteCount}
-              </span>
-            </Link>
-          ))}
+              >
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 999,
+                    background: p.color,
+                    border: "1px solid rgba(31,29,26,.2)",
+                    flexShrink: 0,
+                  }}
+                />
+                <span className="truncate flex-1">{p.name}</span>
+                <span className="font-mono" style={{ fontSize: 11, color: "#A29C90" }}>
+                  {p.noteCount}
+                </span>
+              </button>
+            );
+          })}
           {!projectRows.length && (
             <p style={{ padding: "8px 12px", fontSize: 13, color: "#8B867C" }}>
               Projects appear as notes sync.
@@ -212,11 +241,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <Link
-        href="/account"
-        onClick={() => setDrawerOpen(false)}
-        className="flex items-center gap-3 mt-auto"
-        style={{ padding: "8px 4px" }}
+      <button
+        type="button"
+        onClick={() => go("/account")}
+        className="flex items-center gap-3 mt-auto text-left"
+        style={{
+          padding: "8px 4px",
+          border: "none",
+          background: "transparent",
+          cursor: "pointer",
+          color: "#1F1D1A",
+        }}
       >
         <span
           className="grid place-items-center font-mono"
@@ -243,38 +278,65 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 : "waiting for sync"}
           </div>
         </span>
-      </Link>
+      </button>
     </aside>
   );
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${isDesktop ? "app-shell-desktop" : "app-shell-mobile"}`}>
       {isDesktop && <div className="app-shell-sidebar-desktop">{sidebar}</div>}
+
       {!isDesktop && drawerOpen && (
-        <div
-          className="fixed inset-0 z-40"
-          style={{ background: "rgba(31,29,26,.35)" }}
-          onClick={() => setDrawerOpen(false)}
-        >
-          <div
-            className="h-full w-[min(86vw,280px)]"
-            style={{ background: "#F2F0EA" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {sidebar}
-          </div>
-        </div>
-      )}
-      <main className="app-shell-main">
-        {!isDesktop && (
+        <div className="app-shell-drawer" role="dialog" aria-modal="true" aria-label="Navigation">
           <button
             type="button"
-            className="app-shell-menu-btn btn-ghost"
-            onClick={() => setDrawerOpen(true)}
-          >
-            Menu
-          </button>
-        )}
+            className="app-shell-drawer-backdrop"
+            aria-label="Close menu"
+            onClick={() => setDrawerOpen(false)}
+          />
+          <div className="app-shell-drawer-panel">{sidebar}</div>
+        </div>
+      )}
+
+      <main className="app-shell-main">
+        <div className="app-shell-topbar">
+          {!isDesktop && (
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setDrawerOpen(true)}
+            >
+              Menu
+            </button>
+          )}
+          {backTo && (
+            <button
+              type="button"
+              onClick={() => go(backTo)}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "#6E6A62",
+                fontSize: 13,
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              ← Back
+            </button>
+          )}
+          {!isDesktop && (
+            <button
+              type="button"
+              className="btn-ghost"
+              style={{ marginLeft: "auto" }}
+              onClick={() => go("/notes")}
+            >
+              All notes
+            </button>
+          )}
+        </div>
+
         {usingDemo && (
           <div
             className="mb-5 flex flex-wrap items-center justify-between gap-3"

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AppShell } from "./AppShell";
 import { NoteCard } from "./NoteCard";
@@ -14,6 +15,7 @@ export function LibraryPage({
 }: {
   mode?: "all" | "recent" | "archive";
 }) {
+  const router = useRouter();
   const { notes, projects } = useLibrary();
   const [groupBy, setGroupBy] = useState<GroupBy>("project");
 
@@ -109,12 +111,13 @@ export function LibraryPage({
                   <span className="font-mono" style={{ fontSize: 11, color: "#A29C90" }}>
                     {project.noteCount} notes / {project.sourceCount} sources
                   </span>
-                  <Link
-                    href={`/p/${project.id}`}
-                    style={{ marginLeft: "auto", fontSize: 13, textDecoration: "underline", color: "#4A463F" }}
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/p/${project.id}`)}
+                    style={{ marginLeft: "auto", fontSize: 13, textDecoration: "underline", color: "#4A463F", background: "none", border: "none", cursor: "pointer" }}
                   >
                     Open workspace
-                  </Link>
+                  </button>
                 </div>
                 <div className="note-grid">
                   {groupNotes.map((note, i) => (

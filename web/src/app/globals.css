@@ -181,23 +181,57 @@ input {
   width: 100%;
 }
 
+.app-shell-desktop {
+  grid-template-columns: 236px minmax(0, 1fr);
+}
+
 .app-shell-sidebar-desktop {
-  display: none;
-}
-
-.app-shell-sidebar-desktop .app-shell-close {
-  display: none !important;
-}
-
-.app-shell-menu-btn {
-  display: inline-flex;
-  margin-bottom: 16px;
+  display: block;
+  min-width: 0;
 }
 
 .app-shell-main {
   min-width: 0;
   width: 100%;
   padding: 34px clamp(20px, 4vw, 48px) 60px;
+}
+
+.app-shell-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  min-height: 0;
+}
+
+.app-shell-desktop .app-shell-topbar:empty {
+  display: none;
+}
+
+.app-shell-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+
+.app-shell-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  background: rgba(31, 29, 26, 0.35);
+  cursor: pointer;
+}
+
+.app-shell-drawer-panel {
+  position: relative;
+  z-index: 1;
+  width: min(86vw, 280px);
+  height: 100%;
+  background: #f2f0ea;
+  box-shadow: 8px 0 30px rgba(31, 29, 26, 0.18);
+  overflow: auto;
 }
 
 .note-grid {
@@ -212,18 +246,4 @@ input {
   grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   gap: 20px;
   width: 100%;
-}
-
-@media (min-width: 901px) {
-  .app-shell {
-    grid-template-columns: 236px minmax(0, 1fr);
-  }
-
-  .app-shell-sidebar-desktop {
-    display: block;
-  }
-
-  .app-shell-menu-btn {
-    display: none !important;
-  }
 }
