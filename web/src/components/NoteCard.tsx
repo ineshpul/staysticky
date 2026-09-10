@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import type { Note } from "@/lib/types";
+import { useLibrary } from "@/lib/library";
 import { formatShortDate, hostnameOf } from "@/lib/utils";
 
 const ROTATIONS = [-1.4, 1.1, -0.6, 1.6, -1.9, 0.8];
@@ -16,9 +17,18 @@ export function NoteCard({
   showDate?: boolean;
 }) {
   const router = useRouter();
+  const { deleteNote } = useLibrary();
   const rotate = ROTATIONS[index % ROTATIONS.length];
   const sourceUrl = note.url || note.pageKey || "";
   const host = hostnameOf(sourceUrl);
+
+  async function onDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!window.confirm("Delete this note? It will also be removed from the extension.")) {
+      return;
+    }
+    await deleteNote(note.id);
+  }
 
   return (
     <div
@@ -29,6 +39,7 @@ export function NoteCard({
         background: note.color || "#FFF59D",
         transform: `rotate(${rotate}deg)`,
         cursor: "pointer",
+        position: "relative",
       }}
       onClick={() => router.push(`/n/${note.id}`)}
       onKeyDown={(e) => {
@@ -45,12 +56,28 @@ export function NoteCard({
           display: "flex",
           alignItems: "center",
           justifyContent: "flex-end",
-          gap: 6,
-          paddingRight: 8,
+          gap: 4,
+          paddingRight: 6,
         }}
       >
-        <span style={{ width: 7, height: 7, borderRadius: 999, background: "rgba(0,0,0,.16)" }} />
-        <span style={{ width: 7, height: 7, borderRadius: 999, background: "rgba(0,0,0,.16)" }} />
+        <button
+          type="button"
+          title="Delete note"
+          aria-label="Delete note"
+          onClick={(e) => void onDelete(e)}
+          style={{
+            border: "none",
+            background: "transparent",
+            color: "rgba(0,0,0,.45)",
+            fontSize: 12,
+            lineHeight: 1,
+            padding: "2px 4px",
+            cursor: "pointer",
+            borderRadius: 3,
+          }}
+        >
+          ✕
+        </button>
       </div>
       <div
         style={{
