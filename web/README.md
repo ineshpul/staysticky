@@ -1,7 +1,11 @@
 # Stay Sticky web library
 
-Companion site for the Stay Sticky Chrome extension. Notes sync into Firebase
-(`staysticky-app`) and render in a project library hosted on Vercel.
+Companion site for the Stay Sticky Chrome extension.
+
+**Live:** [https://staysticky-web.vercel.app](https://staysticky-web.vercel.app)
+
+Notes sync into Firebase (`staysticky-app`) and render in a project library
+hosted on Vercel.
 
 ## Stack
 
@@ -22,23 +26,24 @@ Open http://localhost:3000
 
 ## Connect the extension
 
-1. Load the repo root as an unpacked extension in `chrome://extensions`.
+1. Load the **repo root** as an unpacked extension in `chrome://extensions`.
 2. Copy the extension ID.
-3. Sign in on the web app → **Account & sync** → paste the ID → **Connect extension**.
-4. After you deploy to Vercel, add your production domain under
-   `externally_connectable.matches` in [`../manifest.json`](../manifest.json)
-   (already includes `https://*.vercel.app/*` and localhost).
+3. Open the site → **Account & sync** → paste the ID → **Connect extension**.
+4. `externally_connectable` in [`../manifest.json`](../manifest.json) already
+   includes localhost and `https://*.vercel.app/*`.
 
-## Deploy on Vercel
+Step-by-step: [`CONNECT.md`](CONNECT.md).
 
-From `web/`:
+## Deploy
+
+Project is linked as Vercel `staysticky-web`. Firebase `NEXT_PUBLIC_*` env vars
+are set on the project. Redeploy:
 
 ```bash
-npx vercel
+npx vercel --prod
 ```
 
-Set the same `NEXT_PUBLIC_FIREBASE_*` env vars in the Vercel project settings.
-Also add your Vercel domain to Firebase Auth → Authorized domains.
+Add any new domain in Firebase Auth → Authorized domains.
 
 ## Routes
 
