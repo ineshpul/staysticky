@@ -28,7 +28,7 @@ export function AccountPage() {
 
   const settings = profile?.settings || {
     syncEnabled: true,
-    autoGroup: true,
+    autoGroup: false,
     saveSnapshot: false,
   };
 
@@ -198,11 +198,6 @@ export function AccountPage() {
               key: "syncEnabled" as const,
               label: "Sync notes to my account",
               help: "Notes stay in this browser until sync is on. With it on, they follow you to any device signed in.",
-            },
-            {
-              key: "autoGroup" as const,
-              label: "Group new notes automatically",
-              help: "Sorts each new note into a project based on the site hostname. You can always move it.",
             },
             {
               key: "saveSnapshot" as const,

@@ -55,7 +55,7 @@ export type UserProfile = {
 
 export const DEFAULT_SETTINGS: UserSettings = {
   syncEnabled: true,
-  autoGroup: true,
+  autoGroup: false,
   saveSnapshot: false,
 };
 
