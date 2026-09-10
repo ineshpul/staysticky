@@ -1,0 +1,138 @@
+rules_version = '2';
+service cloud.firestore {
+  // ===============================================================
+  // Assumed Data Model
+  // ===============================================================
+  //
+  // Collection: users/{userId}
+  //   - displayName: string
+  //   - email: string
+  //   - photoURL: string | null
+  //   - createdAt: number
+  //   - settings: {
+  //       syncEnabled: bool,
+  //       autoGroup: bool,
+  //       saveSnapshot: bool
+  //     }
+  //
+  // Collection: users/{userId}/notes/{noteId}
+  //   - id, pageKey, url, title, text, color
+  //   - width, height, x, y, minimized
+  //   - createdAt, updatedAt
+  //   - projectId: string | null
+  //   - tags: list<string>
+  //   - archived: bool
+  //   - anchorText: string | null
+  //   - snapshotUrl: string | null
+  //
+  // Collection: users/{userId}/projects/{projectId}
+  //   - id, name, color
+  //   - summary: string | null  (client-side extractive draft, not AI)
+  //   - tags: list<string>
+  //   - createdAt, updatedAt
+  //
+  // ===============================================================
+
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidSettings(s) {
+      return s is map
+        && s.keys().hasOnly(['syncEnabled', 'autoGroup', 'saveSnapshot'])
+        && s.syncEnabled is bool
+        && s.autoGroup is bool
+        && s.saveSnapshot is bool;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasOnly([
+          'displayName', 'email', 'photoURL', 'createdAt', 'settings'
+        ])
+        && data.displayName is string
+        && data.displayName.size() <= 120
+        && data.email is string
+        && data.email.size() <= 320
+        && (data.photoURL == null || data.photoURL is string)
+        && data.createdAt is number
+        && isValidSettings(data.settings);
+    }
+
+    function isValidNote(data) {
+      return data.keys().hasAll([
+          'id', 'pageKey', 'url', 'title', 'text', 'color',
+          'createdAt', 'updatedAt', 'archived'
+        ])
+        && data.id is string
+        && data.pageKey is string
+        && data.url is string
+        && data.title is string
+        && data.text is string
+        && data.text.size() <= 20000
+        && data.color is string
+        && data.createdAt is number
+        && data.updatedAt is number
+        && data.archived is bool
+        && (!('projectId' in data) || data.projectId == null || data.projectId is string)
+        && (!('tags' in data) || data.tags is list)
+        && (!('width' in data) || data.width is number)
+        && (!('height' in data) || data.height is number)
+        && (!('x' in data) || data.x is number)
+        && (!('y' in data) || data.y is number)
+        && (!('minimized' in data) || data.minimized is bool)
+        && (!('anchorText' in data) || data.anchorText == null || data.anchorText is string)
+        && (!('snapshotUrl' in data) || data.snapshotUrl == null || data.snapshotUrl is string);
+    }
+
+    function isValidProject(data) {
+      return data.keys().hasAll(['id', 'name', 'color', 'createdAt', 'updatedAt'])
+        && data.id is string
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 120
+        && data.color is string
+        && data.createdAt is number
+        && data.updatedAt is number
+        && (!('summary' in data) || data.summary == null || data.summary is string)
+        && (!('tags' in data) || data.tags is list);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId)
+        && isValidUser(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isOwner(userId);
+
+      match /notes/{noteId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidNote(request.resource.data)
+          && request.resource.data.id == noteId;
+        allow update: if isOwner(userId)
+          && isValidNote(request.resource.data)
+          && request.resource.data.id == noteId
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isOwner(userId);
+      }
+
+      match /projects/{projectId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidProject(request.resource.data)
+          && request.resource.data.id == projectId;
+        allow update: if isOwner(userId)
+          && isValidProject(request.resource.data)
+          && request.resource.data.id == projectId
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}
