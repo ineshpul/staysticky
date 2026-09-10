@@ -32,6 +32,11 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
   },
+  openGraph: {
+    title: "Stay Sticky",
+    description: "Every thought you had while reading, in one place.",
+    images: [{ url: "/staysticky-mark.png", width: 256, height: 256, alt: "Stay Sticky" }],
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
