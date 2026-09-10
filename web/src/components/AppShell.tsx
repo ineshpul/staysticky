@@ -144,7 +144,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           aria-label="Stay Sticky home"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/staysticky-icon-128.png" alt="Stay Sticky" className="site-logo-sm" />
+          <img src="/staysticky-mark.png" alt="Stay Sticky" className="site-logo-sm" />
         </button>
         {!isDesktop && (
           <button

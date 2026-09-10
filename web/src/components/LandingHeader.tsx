@@ -14,7 +14,7 @@ export function LandingHeader() {
       <Link href="/">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/staysticky-icon-128.png"
+          src="/staysticky-mark.png"
           alt="Stay Sticky"
           className="site-logo"
         />

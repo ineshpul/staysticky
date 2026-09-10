@@ -249,17 +249,17 @@ input {
 }
 
 .site-logo {
-  height: 44px;
+  height: 48px;
   width: auto;
   display: block;
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 .site-logo-sm {
-  height: 34px;
+  height: 36px;
   width: auto;
   display: block;
-  border-radius: 8px;
+  border-radius: 10px;
 }
 
 .marketing-wrap {

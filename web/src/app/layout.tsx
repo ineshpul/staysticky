@@ -25,8 +25,12 @@ export const metadata: Metadata = {
   title: "Stay Sticky",
   description: "Every thought you had while reading, in one place.",
   icons: {
-    icon: [{ url: "/favicon-32.png", sizes: "32x32", type: "image/png" }],
-    apple: [{ url: "/staysticky-icon-128.png", sizes: "128x128", type: "image/png" }],
+    icon: [
+      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/staysticky-mark.png", sizes: "256x256", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
 
