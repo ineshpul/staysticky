@@ -14,12 +14,15 @@ export function LandingHeader() {
       <Link href="/">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/staysticky-logo-lockup.png"
+          src="/staysticky-icon-128.png"
           alt="Stay Sticky"
-          style={{ height: 44, width: "auto" }}
+          className="site-logo"
         />
       </Link>
-      <nav className="flex items-center gap-5" style={{ fontSize: 14, color: "#6E6A62" }}>
+      <nav
+        className="flex flex-wrap items-center gap-3 sm:gap-5"
+        style={{ fontSize: 14, color: "#6E6A62" }}
+      >
         <Link href="/how-it-works">How it works</Link>
         {external ? (
           <a href={extensionHref} target="_blank" rel="noreferrer">

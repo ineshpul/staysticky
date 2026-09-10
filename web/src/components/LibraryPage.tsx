@@ -39,7 +39,7 @@ export function LibraryPage({
   return (
     <AppShell>
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="font-display" style={{ margin: 0, fontSize: 38, letterSpacing: "-0.015em" }}>
+        <h1 className="font-display font-display-mobile-title" style={{ margin: 0, fontSize: 38, letterSpacing: "-0.015em" }}>
           {title}
         </h1>
         {mode === "all" && (

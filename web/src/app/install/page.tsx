@@ -9,7 +9,7 @@ export default function InstallPage() {
   const storeUrl = process.env.NEXT_PUBLIC_CHROME_STORE_URL;
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto", padding: "28px 32px 80px" }}>
+    <div className="marketing-wrap">
       <LandingHeader />
 
       <p

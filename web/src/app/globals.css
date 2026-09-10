@@ -193,7 +193,7 @@ input {
 .app-shell-main {
   min-width: 0;
   width: 100%;
-  padding: 34px clamp(20px, 4vw, 48px) 60px;
+  padding: 34px clamp(16px, 4vw, 48px) 60px;
 }
 
 .app-shell-topbar {
@@ -236,14 +236,76 @@ input {
 
 .note-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(228px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 228px), 1fr));
   gap: 22px;
   width: 100%;
 }
 
 .note-grid-compact {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
   gap: 20px;
   width: 100%;
+}
+
+.site-logo {
+  height: 44px;
+  width: auto;
+  display: block;
+  border-radius: 10px;
+}
+
+.site-logo-sm {
+  height: 34px;
+  width: auto;
+  display: block;
+  border-radius: 8px;
+}
+
+.marketing-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px clamp(16px, 4vw, 32px) 80px;
+}
+
+.landing-hero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 40px;
+  align-items: center;
+  margin-top: 48px;
+}
+
+.landing-mock {
+  position: relative;
+  height: 400px;
+}
+
+@media (max-width: 640px) {
+  .site-logo {
+    height: 36px;
+    border-radius: 8px;
+  }
+
+  .landing-hero {
+    gap: 28px;
+    margin-top: 28px;
+  }
+
+  .landing-mock {
+    height: 260px;
+  }
+
+  .app-shell-main {
+    padding-top: 20px;
+    padding-bottom: 40px;
+  }
+
+  .font-display-mobile-title {
+    font-size: 30px !important;
+  }
+}
+
+code {
+  overflow-wrap: anywhere;
 }

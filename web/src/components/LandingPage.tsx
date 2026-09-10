@@ -11,30 +11,16 @@ export function LandingPage() {
   const storeLive = isChromeStoreLinked();
 
   return (
-    <div
-      style={{
-        maxWidth: 1100,
-        margin: "0 auto",
-        padding: "28px 32px 80px",
-      }}
-    >
+    <div className="marketing-wrap">
       <LandingHeader />
 
-      <section
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-          gap: 56,
-          alignItems: "center",
-          marginTop: 56,
-        }}
-      >
+      <section className="landing-hero">
         <div>
           <h1
             className="font-display"
             style={{
               margin: "0 0 18px",
-              fontSize: "clamp(42px, 6vw, 68px)",
+              fontSize: "clamp(34px, 8vw, 68px)",
               lineHeight: 1.02,
               letterSpacing: "-0.02em",
               color: "#1F1D1A",
@@ -77,7 +63,7 @@ export function LandingPage() {
           </div>
         </div>
 
-        <div style={{ position: "relative", height: 400 }}>
+        <div className="landing-mock">
           <div
             style={{
               height: "100%",

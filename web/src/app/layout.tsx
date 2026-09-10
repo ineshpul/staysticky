@@ -24,6 +24,10 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Stay Sticky",
   description: "Every thought you had while reading, in one place.",
+  icons: {
+    icon: [{ url: "/favicon-32.png", sizes: "32x32", type: "image/png" }],
+    apple: [{ url: "/staysticky-icon-128.png", sizes: "128x128", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

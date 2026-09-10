@@ -24,10 +24,10 @@ export function HowItWorksPage() {
   const slide = SLIDES[index];
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 32px 80px" }}>
+    <div className="marketing-wrap">
       <LandingHeader />
 
-      <section style={{ marginTop: 56, maxWidth: 720 }}>
+      <section style={{ marginTop: 48, maxWidth: 720 }}>
         <p
           className="font-mono"
           style={{
