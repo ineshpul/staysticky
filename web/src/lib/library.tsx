@@ -50,7 +50,10 @@ type LibraryContextValue = {
   refreshProjectSummary: (projectId: string) => Promise<void>;
   importNotes: (notes: Note[]) => Promise<void>;
   importProjects: (projects: Project[]) => Promise<void>;
-  pruneEmptyProjects: (keepProjectId?: string | null) => Promise<number>;
+  pruneEmptyProjects: (
+    keepProjectId?: string | null,
+    opts?: { graceMs?: number },
+  ) => Promise<number>;
 };
 
 async function mirrorNotesToExtension(notesToPush: Note[]) {
@@ -338,10 +341,16 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   );
 
   const pruneEmptyProjects = useCallback(
-    async (keepProjectId?: string | null) => {
+    async (keepProjectId?: string | null, opts?: { graceMs?: number }) => {
+      // Avoid deleting projects that just synced in before their notes land.
+      const graceMs = opts?.graceMs ?? 120_000;
+      const now = Date.now();
       const empties = projects.filter((p) => {
         if (keepProjectId && p.id === keepProjectId) return false;
-        return !notes.some((n) => n.projectId === p.id && !n.archived);
+        const hasNotes = notes.some((n) => n.projectId === p.id && !n.archived);
+        if (hasNotes) return false;
+        const age = now - Math.max(Number(p.createdAt) || 0, Number(p.updatedAt) || 0);
+        return age > graceMs;
       });
       for (const p of empties) {
         await deleteProject(p.id);

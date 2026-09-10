@@ -72,12 +72,17 @@ export function OnboardingPage() {
       const merged = res.notes.map((incoming) =>
         mergeIncomingNote(cloudById.get(incoming.id), incoming),
       );
-      if (res.projects.length) {
+      await importNotes(merged);
+
+      const referenced = new Set(
+        merged.map((n) => n.projectId).filter((id): id is string => Boolean(id)),
+      );
+      const projectsToImport = res.projects.filter((p) => referenced.has(p.id));
+      if (projectsToImport.length) {
         await importProjects(
-          res.projects.map((incoming) => mergeIncomingProject(undefined, incoming)),
+          projectsToImport.map((incoming) => mergeIncomingProject(undefined, incoming)),
         );
       }
-      await importNotes(merged);
       setStatus(`Linked. Imported ${merged.length} notes.`);
     } finally {
       setBusy(false);

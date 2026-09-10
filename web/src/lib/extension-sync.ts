@@ -75,19 +75,31 @@ export function normalizeExtensionProject(p: Record<string, unknown>): Project {
 
 export function mergeIncomingNote(existing: Note | undefined, incoming: Note): Note {
   if (!existing) return incoming;
-  if (incoming.updatedAt > existing.updatedAt) {
+
+  // Prefer the newer note body, but never drop a project tag just because the
+  // other side last edited text without one.
+  if (incoming.updatedAt >= existing.updatedAt) {
     return {
+      ...existing,
       ...incoming,
-      projectId: incoming.projectId ?? existing.projectId,
+      projectId:
+        incoming.projectId !== undefined && incoming.projectId !== null
+          ? incoming.projectId
+          : existing.projectId ?? incoming.projectId,
       tags: incoming.tags.length ? incoming.tags : existing.tags,
-      archived: incoming.archived,
       sourceAuthor: incoming.sourceAuthor ?? existing.sourceAuthor,
       sourcePublishedAt: incoming.sourcePublishedAt ?? existing.sourcePublishedAt,
     };
   }
+
   return {
+    ...incoming,
     ...existing,
-    projectId: existing.projectId ?? incoming.projectId,
+    projectId:
+      existing.projectId !== undefined && existing.projectId !== null
+        ? existing.projectId
+        : incoming.projectId ?? existing.projectId,
+    tags: existing.tags.length ? existing.tags : incoming.tags,
     sourceAuthor: existing.sourceAuthor ?? incoming.sourceAuthor,
     sourcePublishedAt: existing.sourcePublishedAt ?? incoming.sourcePublishedAt,
   };

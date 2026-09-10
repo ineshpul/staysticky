@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useLibrary } from "@/lib/library";
 import {
-  deleteProjectInExtension,
   fetchFromExtension,
   getSavedExtensionId,
   isExtensionLinked,
@@ -14,7 +13,7 @@ import {
   pushProjectsToExtension,
 } from "@/lib/extension-sync";
 
-const POLL_MS = 15000;
+const POLL_MS = 12000;
 
 function referencedProjectIds(notes: { projectId: string | null }[]): Set<string> {
   return new Set(
@@ -23,10 +22,10 @@ function referencedProjectIds(notes: { projectId: string | null }[]): Set<string
 }
 
 /** Keeps extension ↔ Firestore sync running after the first successful link.
- *  Only syncs projects that notes actually reference — never invents empty ones. */
+ *  Projects that notes reference are imported; empty leftovers are pruned later. */
 export function ExtensionSync() {
   const { user, profile } = useAuth();
-  const { notes, projects, importNotes, importProjects, pruneEmptyProjects } = useLibrary();
+  const { notes, projects, importNotes, importProjects } = useLibrary();
   const notesRef = useRef(notes);
   const projectsRef = useRef(projects);
   notesRef.current = notes;
@@ -51,45 +50,48 @@ export function ExtensionSync() {
         mergeIncomingNote(cloudNotes.get(incoming.id), incoming),
       );
 
-      const referenced = referencedProjectIds([
-        ...mergedNotes,
-        ...notesRef.current,
-      ]);
+      // Notes must land first so project refs exist before anything prunes.
+      await importNotes(mergedNotes);
+      if (cancelled) return;
 
-      const byId = new Map(
-        projectsRef.current
-          .filter((p) => referenced.has(p.id))
-          .map((p) => [p.id, p]),
-      );
+      const referenced = referencedProjectIds(mergedNotes);
+
+      const byId = new Map<string, (typeof res.projects)[number]>();
+      for (const cloud of projectsRef.current) {
+        if (referenced.has(cloud.id)) byId.set(cloud.id, cloud);
+      }
       for (const incoming of res.projects) {
         if (!referenced.has(incoming.id)) continue;
-        byId.set(incoming.id, mergeIncomingProject(byId.get(incoming.id), incoming));
+        byId.set(
+          incoming.id,
+          mergeIncomingProject(byId.get(incoming.id), incoming),
+        );
       }
-      const mergedProjects = [...byId.values()];
 
+      // Also keep extension projects that notes just pointed at, even if the
+      // project map was briefly missing (create-then-tag race).
+      for (const note of mergedNotes) {
+        if (!note.projectId || byId.has(note.projectId)) continue;
+        const fromExt = res.projects.find((p) => p.id === note.projectId);
+        if (fromExt) {
+          byId.set(fromExt.id, fromExt);
+        }
+      }
+
+      const mergedProjects = [...byId.values()];
       if (mergedProjects.length) {
         await importProjects(mergedProjects);
       }
 
-      // Drop orphan projects that still live only in the extension.
-      for (const orphan of res.projects) {
-        if (!referenced.has(orphan.id)) {
-          await deleteProjectInExtension(extensionId, orphan.id);
-        }
-      }
-
-      const toPush = projectsRef.current.filter((p) => referenced.has(p.id));
-      if (toPush.length) {
-        await pushProjectsToExtension(extensionId, toPush);
-      }
-
-      await importNotes(mergedNotes);
-      if (!cancelled) {
-        const keep =
-          typeof window !== "undefined" && window.location.pathname.startsWith("/p/")
-            ? window.location.pathname.split("/")[2] || null
-            : null;
-        await pruneEmptyProjects(keep);
+      // Push web/cloud project metadata back, but never wipe extension-only
+      // projects that are still referenced by local notes.
+      const toPush = [
+        ...projectsRef.current.filter((p) => referenced.has(p.id)),
+        ...mergedProjects,
+      ];
+      const pushMap = new Map(toPush.map((p) => [p.id, p]));
+      if (pushMap.size) {
+        await pushProjectsToExtension(extensionId, [...pushMap.values()]);
       }
     }
 
@@ -108,12 +110,12 @@ export function ExtensionSync() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [user, profile?.settings.syncEnabled, importNotes, importProjects, pruneEmptyProjects]);
+  }, [user, profile?.settings.syncEnabled, importNotes, importProjects]);
 
   return null;
 }
 
-/** Removes empty leftover projects (auto-created hostnames, unused demos, etc.). */
+/** Removes empty leftover projects after notes have had time to sync in. */
 export function EmptyProjectPruner() {
   const pathname = usePathname();
   const { user } = useAuth();
@@ -127,19 +129,22 @@ export function EmptyProjectPruner() {
     const keep =
       pathname.startsWith("/p/") ? pathname.split("/")[2] || null : null;
 
-    const hasEmpties = projects.some(
-      (p) =>
-        p.id !== keep &&
-        !notes.some((n) => n.projectId === p.id && !n.archived),
-    );
-    if (!hasEmpties) return;
+    const graceMs = 120_000;
+    const now = Date.now();
+    const hasStaleEmpties = projects.some((p) => {
+      if (p.id === keep) return false;
+      if (notes.some((n) => n.projectId === p.id && !n.archived)) return false;
+      const age = now - Math.max(Number(p.createdAt) || 0, Number(p.updatedAt) || 0);
+      return age > graceMs;
+    });
+    if (!hasStaleEmpties) return;
 
     const timer = window.setTimeout(() => {
       pruning.current = true;
-      void pruneEmptyProjects(keep).finally(() => {
+      void pruneEmptyProjects(keep, { graceMs }).finally(() => {
         pruning.current = false;
       });
-    }, 600);
+    }, 2500);
 
     return () => window.clearTimeout(timer);
   }, [user, usingDemo, notes, projects, pathname, pruneEmptyProjects]);
