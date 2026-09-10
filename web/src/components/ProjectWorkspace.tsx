@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "./AppShell";
 import { NoteCard } from "./NoteCard";
+import { ProjectExportMenu } from "./ProjectExportMenu";
 import { useLibrary } from "@/lib/library";
 import { buildExtractiveSummary, projectStats } from "@/lib/summary";
 import { hostnameOf } from "@/lib/utils";
@@ -350,21 +351,11 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
             >
               Refresh draft
             </button>
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() => {
-                const blob = new Blob([summaryText], { type: "text/plain" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `${project.name.replace(/\s+/g, "-").toLowerCase()}-summary.txt`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }}
-            >
-              Export
-            </button>
+            <ProjectExportMenu
+              project={project}
+              notes={notes}
+              summary={summaryText}
+            />
           </div>
         </aside>
       </div>
