@@ -1,8 +1,9 @@
 # Stay Sticky
 
-A Chrome (Manifest V3) extension for pinning virtual sticky notes to any webpage.
-Notes stick to the exact spot on the page you dropped them at, and reappear
-automatically — same spot, same text — every time you come back.
+A Chrome (Manifest V3) extension for pinning virtual sticky notes to any webpage —
+take notes on sites without ever leaving the tab. Notes stick to the exact spot
+on the page you dropped them at, and reappear automatically — same spot, same
+text — every time you come back.
 
 ## What it does
 
