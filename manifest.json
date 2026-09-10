@@ -17,6 +17,9 @@
     },
     "default_title": "Stay Sticky"
   },
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
@@ -26,5 +29,12 @@
     }
   ],
   "permissions": ["storage", "tabs"],
-  "host_permissions": ["http://*/*", "https://*/*"]
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "externally_connectable": {
+    "matches": [
+      "http://localhost:3000/*",
+      "http://127.0.0.1:3000/*",
+      "https://*.vercel.app/*"
+    ]
+  }
 }
