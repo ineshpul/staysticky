@@ -27,6 +27,10 @@ export type Note = {
   archived: boolean;
   anchorText?: string | null;
   snapshotUrl?: string | null;
+  /** Optional citation author (person or organization). Free to set; may be filled from page meta. */
+  sourceAuthor?: string | null;
+  /** Optional publication date as YYYY-MM-DD when known. */
+  sourcePublishedAt?: string | null;
 };
 
 export type Project = {

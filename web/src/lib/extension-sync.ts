@@ -50,6 +50,8 @@ export function normalizeExtensionNote(n: Record<string, unknown>): Note {
     archived: Boolean(n.archived),
     anchorText: (n.anchorText as string) || null,
     snapshotUrl: (n.snapshotUrl as string) || null,
+    sourceAuthor: (n.sourceAuthor as string) || null,
+    sourcePublishedAt: (n.sourcePublishedAt as string) || null,
   };
 }
 
@@ -73,11 +75,15 @@ export function mergeIncomingNote(existing: Note | undefined, incoming: Note): N
       projectId: incoming.projectId ?? existing.projectId,
       tags: incoming.tags.length ? incoming.tags : existing.tags,
       archived: incoming.archived,
+      sourceAuthor: incoming.sourceAuthor ?? existing.sourceAuthor,
+      sourcePublishedAt: incoming.sourcePublishedAt ?? existing.sourcePublishedAt,
     };
   }
   return {
     ...existing,
     projectId: existing.projectId ?? incoming.projectId,
+    sourceAuthor: existing.sourceAuthor ?? incoming.sourceAuthor,
+    sourcePublishedAt: existing.sourcePublishedAt ?? incoming.sourcePublishedAt,
   };
 }
 

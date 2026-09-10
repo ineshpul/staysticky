@@ -42,6 +42,10 @@ type LibraryContextValue = {
   renameProject: (projectId: string, name: string) => Promise<void>;
   deleteProject: (projectId: string) => Promise<void>;
   assignNoteToProject: (noteId: string, projectId: string | null) => Promise<void>;
+  updateSourceCitationMeta: (
+    sourceKey: string,
+    meta: { author: string | null; publishedAt: string | null },
+  ) => Promise<void>;
   refreshProjectSummary: (projectId: string) => Promise<void>;
   importNotes: (notes: Note[]) => Promise<void>;
   importProjects: (projects: Project[]) => Promise<void>;
@@ -234,6 +238,28 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [notes, upsertNote],
   );
 
+  const updateSourceCitationMeta = useCallback(
+    async (
+      sourceKey: string,
+      meta: { author: string | null; publishedAt: string | null },
+    ) => {
+      const matching = notes.filter((n) => {
+        const key = (n.url || "").trim() || (n.pageKey || "").trim();
+        return key === sourceKey;
+      });
+      const now = Date.now();
+      for (const note of matching) {
+        await upsertNote({
+          ...note,
+          sourceAuthor: meta.author,
+          sourcePublishedAt: meta.publishedAt,
+          updatedAt: now,
+        });
+      }
+    },
+    [notes, upsertNote],
+  );
+
   const refreshProjectSummary = useCallback(
     async (projectId: string) => {
       const project = projects.find((p) => p.id === projectId);
@@ -313,6 +339,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       renameProject,
       deleteProject,
       assignNoteToProject,
+      updateSourceCitationMeta,
       refreshProjectSummary,
       importNotes,
       importProjects,
@@ -329,6 +356,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       renameProject,
       deleteProject,
       assignNoteToProject,
+      updateSourceCitationMeta,
       refreshProjectSummary,
       importNotes,
       importProjects,
