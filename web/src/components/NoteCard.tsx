@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Note } from "@/lib/types";
 import { formatShortDate, hostnameOf } from "@/lib/utils";
 
@@ -15,14 +15,27 @@ export function NoteCard({
   index?: number;
   showDate?: boolean;
 }) {
+  const router = useRouter();
   const rotate = ROTATIONS[index % ROTATIONS.length];
+  const sourceUrl = note.url || note.pageKey || "";
+  const host = hostnameOf(sourceUrl);
+
   return (
-    <Link
-      href={`/n/${note.id}`}
+    <div
+      role="link"
+      tabIndex={0}
       className="note-card"
       style={{
         background: note.color || "#FFF59D",
         transform: `rotate(${rotate}deg)`,
+        cursor: "pointer",
+      }}
+      onClick={() => router.push(`/n/${note.id}`)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          router.push(`/n/${note.id}`);
+        }
       }}
     >
       <div
@@ -60,12 +73,29 @@ export function NoteCard({
           {note.text || "Empty note"}
         </p>
         <div>
-          <div
-            className="font-mono truncate"
-            style={{ fontSize: 10.5, color: "rgba(0,0,0,.52)" }}
-          >
-            {hostnameOf(note.url || note.pageKey)}
-          </div>
+          {sourceUrl ? (
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono truncate"
+              title="Open original page"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                display: "block",
+                fontSize: 10.5,
+                color: "rgba(0,0,0,.62)",
+                textDecoration: "underline",
+                textUnderlineOffset: 2,
+              }}
+            >
+              {host || sourceUrl}
+            </a>
+          ) : (
+            <div className="font-mono truncate" style={{ fontSize: 10.5, color: "rgba(0,0,0,.52)" }}>
+              Unknown source
+            </div>
+          )}
           {showDate && (
             <div className="font-mono" style={{ fontSize: 10, color: "rgba(0,0,0,.4)", marginTop: 2 }}>
               {formatShortDate(note.updatedAt || note.createdAt)}
@@ -73,6 +103,6 @@ export function NoteCard({
           )}
         </div>
       </div>
-    </Link>
+    </div>
   );
 }

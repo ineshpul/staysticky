@@ -298,7 +298,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           </div>
           {!projectNotes.length && !pickerOpen && (
             <p style={{ color: "#8B867C", fontSize: 14 }}>
-              No notes here yet. Use Add notes, or open a note and pick this project.
+              No notes in this project. Tag a note into it, or delete the project if it was created by
+              mistake.
             </p>
           )}
         </section>
