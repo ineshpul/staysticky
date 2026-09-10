@@ -14,6 +14,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signIn } = useAuth();
   const { notes, projects, usingDemo, lastSyncedAt } = useLibrary();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 901px)");
+    const sync = () => {
+      setIsDesktop(mq.matches);
+      if (mq.matches) setDrawerOpen(false);
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -106,14 +118,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/staysticky-logo-lockup.png" alt="Stay Sticky" style={{ height: 34 }} />
         </Link>
-        <button
-          type="button"
-          className="app-shell-close btn-ghost"
-          style={{ padding: "4px 10px" }}
-          onClick={() => setDrawerOpen(false)}
-        >
-          Close
-        </button>
+        {!isDesktop && (
+          <button
+            type="button"
+            className="app-shell-close btn-ghost"
+            style={{ padding: "4px 10px" }}
+            onClick={() => setDrawerOpen(false)}
+          >
+            Close
+          </button>
+        )}
       </div>
 
       <button
@@ -235,8 +249,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app-shell">
-      <div className="app-shell-sidebar-desktop">{sidebar}</div>
-      {drawerOpen && (
+      {isDesktop && <div className="app-shell-sidebar-desktop">{sidebar}</div>}
+      {!isDesktop && drawerOpen && (
         <div
           className="fixed inset-0 z-40"
           style={{ background: "rgba(31,29,26,.35)" }}
@@ -252,13 +266,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
       <main className="app-shell-main">
-        <button
-          type="button"
-          className="app-shell-menu-btn btn-ghost"
-          onClick={() => setDrawerOpen(true)}
-        >
-          Menu
-        </button>
+        {!isDesktop && (
+          <button
+            type="button"
+            className="app-shell-menu-btn btn-ghost"
+            onClick={() => setDrawerOpen(true)}
+          >
+            Menu
+          </button>
+        )}
         {usingDemo && (
           <div
             className="mb-5 flex flex-wrap items-center justify-between gap-3"

@@ -186,7 +186,7 @@ input {
 }
 
 .app-shell-sidebar-desktop .app-shell-close {
-  display: none;
+  display: none !important;
 }
 
 .app-shell-menu-btn {
