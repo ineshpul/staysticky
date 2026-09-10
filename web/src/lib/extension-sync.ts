@@ -15,10 +15,16 @@ export function getSavedExtensionId(): string {
 export function saveExtensionLink(extensionId: string) {
   localStorage.setItem(EXT_ID_KEY, extensionId.trim());
   localStorage.setItem(LINKED_KEY, "1");
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("ss-extension-link-changed"));
+  }
 }
 
 export function clearExtensionLink() {
   localStorage.removeItem(LINKED_KEY);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("ss-extension-link-changed"));
+  }
 }
 
 export function isExtensionLinked(): boolean {
