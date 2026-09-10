@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 
+const EXTENSION_URL =
+  process.env.NEXT_PUBLIC_CHROME_STORE_URL ||
+  "https://github.com/ineshpul/staysticky#install-the-extension-unpacked";
+
 export function LandingHeader() {
   const { user, signIn } = useAuth();
 
@@ -18,11 +22,7 @@ export function LandingHeader() {
       </Link>
       <nav className="flex items-center gap-5" style={{ fontSize: 14, color: "#6E6A62" }}>
         <Link href="/how-it-works">How it works</Link>
-        <a
-          href="https://github.com/ineshpul/staysticky"
-          target="_blank"
-          rel="noreferrer"
-        >
+        <a href={EXTENSION_URL} target="_blank" rel="noreferrer">
           Extension
         </a>
         {user ? (

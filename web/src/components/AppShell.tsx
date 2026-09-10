@@ -137,7 +137,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"
-          onClick={() => go("/notes")}
+          onClick={() => go("/")}
           style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer" }}
           aria-label="Stay Sticky home"
         >

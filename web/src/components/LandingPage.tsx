@@ -64,7 +64,10 @@ export function LandingPage() {
             )}
             <a
               className="btn-ghost"
-              href="https://github.com/ineshpul/staysticky"
+              href={
+                process.env.NEXT_PUBLIC_CHROME_STORE_URL ||
+                "https://github.com/ineshpul/staysticky#install-the-extension-unpacked"
+              }
               target="_blank"
               rel="noreferrer"
             >
