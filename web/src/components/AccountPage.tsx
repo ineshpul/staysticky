@@ -1,19 +1,30 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "./AppShell";
 import { useAuth } from "@/lib/auth";
 import { useLibrary } from "@/lib/library";
-import { requestExtensionSync } from "@/lib/utils";
+import {
+  clearExtensionLink,
+  fetchNotesFromExtension,
+  getSavedExtensionId,
+  isExtensionLinked,
+  mergeIncomingNote,
+  saveExtensionLink,
+} from "@/lib/extension-sync";
 
 export function AccountPage() {
   const { user, profile, signIn, signOut, updateSettings } = useAuth();
   const { notes, usingDemo, lastSyncedAt, importNotes } = useLibrary();
-  const [extensionId, setExtensionId] = useState(
-    process.env.NEXT_PUBLIC_EXTENSION_ID || "",
-  );
+  const [extensionId, setExtensionId] = useState("");
   const [status, setStatus] = useState("");
   const [linked, setLinked] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setExtensionId(getSavedExtensionId());
+    setLinked(isExtensionLinked());
+  }, []);
 
   const settings = profile?.settings || {
     syncEnabled: true,
@@ -28,45 +39,43 @@ export function AccountPage() {
       setStatus("Paste your Chrome extension ID from chrome://extensions.");
       return;
     }
-    localStorage.setItem("ss_extension_id", extensionId.trim());
-    const res = await requestExtensionSync(extensionId.trim());
-    setLinked(res.ok);
-    setStatus(res.message);
-    if (res.ok) {
-      // Extension may respond with notes in a follow-up; also listen once.
-      const chromeApi = (globalThis as unknown as { chrome?: typeof chrome }).chrome;
-      chromeApi?.runtime?.sendMessage(
-        extensionId.trim(),
-        { type: "SS_WEB_GET_NOTES" },
-        (response) => {
-          if (response?.notes && Array.isArray(response.notes)) {
-            void importNotes(
-              response.notes.map((n: Record<string, unknown>) => ({
-                id: String(n.id),
-                pageKey: String(n.pageKey || ""),
-                url: String(n.url || ""),
-                title: String(n.title || ""),
-                text: String(n.text || ""),
-                color: String(n.color || "#FFF59D"),
-                width: typeof n.width === "number" ? n.width : undefined,
-                height: typeof n.height === "number" ? n.height : undefined,
-                x: typeof n.x === "number" ? n.x : undefined,
-                y: typeof n.y === "number" ? n.y : undefined,
-                minimized: Boolean(n.minimized),
-                createdAt: Number(n.createdAt) || Date.now(),
-                updatedAt: Number(n.updatedAt) || Date.now(),
-                projectId: (n.projectId as string) || null,
-                tags: Array.isArray(n.tags) ? (n.tags as string[]) : [],
-                archived: Boolean(n.archived),
-                anchorText: (n.anchorText as string) || null,
-                snapshotUrl: (n.snapshotUrl as string) || null,
-              })),
-            );
-            setStatus(`Imported ${response.notes.length} notes from the extension.`);
-          }
-        },
-      );
+    if (!user) {
+      setStatus("Sign in first so synced notes can be saved to your account.");
+      await signIn();
+      return;
     }
+
+    setBusy(true);
+    setStatus("Connecting…");
+    try {
+      const id = extensionId.trim();
+      const res = await fetchNotesFromExtension(id);
+      setLinked(res.ok);
+      if (!res.ok) {
+        setStatus(res.message);
+        return;
+      }
+
+      saveExtensionLink(id);
+      setLinked(true);
+
+      const cloudById = new Map(notes.map((n) => [n.id, n]));
+      const merged = res.notes.map((incoming) =>
+        mergeIncomingNote(cloudById.get(incoming.id), incoming),
+      );
+      await importNotes(merged);
+      setStatus(
+        `Linked permanently. Imported ${merged.length} notes — Stay Sticky will keep syncing automatically.`,
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function unlink() {
+    clearExtensionLink();
+    setLinked(false);
+    setStatus("Unlinked. Pasting the same ID and connecting again will re-enable auto-sync.");
   }
 
   return (
@@ -76,8 +85,8 @@ export function AccountPage() {
           Account & sync
         </h1>
         <p style={{ margin: "10px 0 28px", fontSize: 14.5, color: "#6E6A62" }}>
-          Your notes live in the browser until you connect an account. Connecting keeps them
-          across devices.
+          Link the extension once. After that, notes sync automatically whenever you open this
+          library — no need to reconnect each visit.
         </p>
 
         <div
@@ -102,7 +111,7 @@ export function AccountPage() {
           <div className="min-w-0 flex-1">
             <div style={{ fontSize: 14.5, fontWeight: 600 }}>Stay Sticky for Chrome</div>
             <div className="font-mono" style={{ fontSize: 11, color: "#8B867C", marginTop: 4 }}>
-              v1.0.0 · {linked ? "connected" : "not linked"} ·{" "}
+              v1.1.0 · {linked ? "auto-sync on" : "not linked"} ·{" "}
               {lastSyncedAt
                 ? `last sync ${new Date(lastSyncedAt).toLocaleTimeString()}`
                 : usingDemo
@@ -137,31 +146,49 @@ export function AccountPage() {
             Extension ID
           </label>
           <p style={{ margin: "0 0 12px", fontSize: 13, color: "#6E6A62" }}>
-            Load the unpacked extension, open chrome://extensions, enable Developer mode, and
-            copy the ID. Then connect so this Vercel site can pull your local notes.
+            One-time setup: open chrome://extensions, enable Developer mode, copy the Stay Sticky
+            ID, then connect. We save the link in this browser so sync stays on.
           </p>
           <div className="flex flex-wrap gap-2">
             <input
               value={extensionId}
               onChange={(e) => setExtensionId(e.target.value)}
               placeholder="abcdefghijklmnopqrstuvwxyz123456"
+              disabled={linked}
               style={{
                 flex: 1,
                 minWidth: 220,
                 border: "1px solid rgba(31,29,26,.16)",
                 borderRadius: 8,
                 padding: "10px 12px",
-                background: "#FBFAF7",
+                background: linked ? "#F2F0EA" : "#FBFAF7",
                 fontFamily: "var(--font-mono)",
                 fontSize: 12,
               }}
             />
-            <button type="button" className="btn-dark" onClick={() => void connectExtension()}>
-              Connect extension
-            </button>
+            {linked ? (
+              <button type="button" className="btn-ghost" onClick={unlink}>
+                Unlink
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn-dark"
+                disabled={busy}
+                onClick={() => void connectExtension()}
+              >
+                {busy ? "Connecting…" : "Connect once"}
+              </button>
+            )}
           </div>
           {status && (
             <p style={{ margin: "12px 0 0", fontSize: 13, color: "#4A463F" }}>{status}</p>
+          )}
+          {linked && (
+            <p style={{ margin: "12px 0 0", fontSize: 13, color: "#6E6A62" }}>
+              Auto-sync runs every few seconds while this site is open, and again whenever you
+              return to the tab.
+            </p>
           )}
         </div>
 
@@ -175,7 +202,7 @@ export function AccountPage() {
             {
               key: "autoGroup" as const,
               label: "Group new notes automatically",
-              help: "Sorts each new note into a project based on shared sites and keywords. You can always move it.",
+              help: "Sorts each new note into a project based on the site hostname. You can always move it.",
             },
             {
               key: "saveSnapshot" as const,

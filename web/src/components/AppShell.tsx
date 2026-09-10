@@ -20,9 +20,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, profile, loading, signIn } = useAuth();
-  const { notes, projects, usingDemo, lastSyncedAt } = useLibrary();
+  const { notes, projects, usingDemo, lastSyncedAt, createProject } = useLibrary();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
 
   const go = useCallback(
     (href: string) => {
@@ -233,10 +235,90 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             );
           })}
-          {!projectRows.length && (
+          {!projectRows.length && !newProjectOpen && (
             <p style={{ padding: "8px 12px", fontSize: 13, color: "#8B867C" }}>
-              Projects appear as notes sync.
+              Create a project, then assign notes to it.
             </p>
+          )}
+          {newProjectOpen ? (
+            <div className="flex flex-col gap-2" style={{ padding: "4px 8px" }}>
+              <input
+                autoFocus
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setNewProjectOpen(false);
+                    setNewProjectName("");
+                  }
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const name = newProjectName.trim();
+                    if (!name) return;
+                    void createProject(name).then((p) => {
+                      setNewProjectOpen(false);
+                      setNewProjectName("");
+                      go(`/p/${p.id}`);
+                    });
+                  }
+                }}
+                placeholder="Project name"
+                style={{
+                  width: "100%",
+                  border: "1px solid rgba(31,29,26,.16)",
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  background: "#FBFAF7",
+                  fontSize: 13,
+                }}
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="btn-dark"
+                  style={{ padding: "6px 10px", fontSize: 12 }}
+                  onClick={() => {
+                    const name = newProjectName.trim();
+                    if (!name) return;
+                    void createProject(name).then((p) => {
+                      setNewProjectOpen(false);
+                      setNewProjectName("");
+                      go(`/p/${p.id}`);
+                    });
+                  }}
+                >
+                  Create
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  style={{ padding: "6px 10px", fontSize: 12 }}
+                  onClick={() => {
+                    setNewProjectOpen(false);
+                    setNewProjectName("");
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setNewProjectOpen(true)}
+              className="flex w-full items-center text-left"
+              style={{
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: "none",
+                cursor: "pointer",
+                fontSize: 13.5,
+                background: "transparent",
+                color: "#6E6A62",
+              }}
+            >
+              + New project
+            </button>
           )}
         </div>
       </div>

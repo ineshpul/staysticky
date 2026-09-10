@@ -70,7 +70,8 @@ export default function InstallPage() {
               <Link href="/account" style={{ textDecoration: "underline" }}>
                 Account & sync
               </Link>{" "}
-              → paste your extension ID from <code>chrome://extensions</code> → Connect.
+              → paste your extension ID from <code>chrome://extensions</code> → Connect once
+              (auto-sync stays on after that).
             </li>
           </ol>
           <p style={{ margin: "18px 0 0", fontSize: 13.5, color: "#8B867C" }}>

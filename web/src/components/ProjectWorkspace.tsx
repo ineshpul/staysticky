@@ -1,18 +1,28 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "./AppShell";
 import { NoteCard } from "./NoteCard";
 import { useLibrary } from "@/lib/library";
 import { buildExtractiveSummary, projectStats } from "@/lib/summary";
+import { hostnameOf } from "@/lib/utils";
 
 export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const router = useRouter();
-  const { projects, notes, refreshProjectSummary } = useLibrary();
+  const { projects, notes, refreshProjectSummary, assignNoteToProject } = useLibrary();
+  const [pickerOpen, setPickerOpen] = useState(false);
   const project = projects.find((p) => p.id === projectId);
   const { notes: projectNotes, noteCount, sourceCount } = useMemo(
     () => projectStats(notes, projectId),
+    [notes, projectId],
+  );
+
+  const addableNotes = useMemo(
+    () =>
+      notes.filter(
+        (n) => !n.archived && n.projectId !== projectId,
+      ),
     [notes, projectId],
   );
 
@@ -80,12 +90,80 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           <div className="flex items-center gap-3" style={{ marginBottom: 18 }}>
             <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Notes</h2>
             <div style={{ flex: 1, height: 1, background: "rgba(31,29,26,.10)" }} />
+            <button
+              type="button"
+              className="btn-ghost"
+              style={{ padding: "6px 10px", fontSize: 12.5 }}
+              onClick={() => setPickerOpen((v) => !v)}
+            >
+              {pickerOpen ? "Done" : "Add notes"}
+            </button>
           </div>
+
+          {pickerOpen && (
+            <div
+              style={{
+                background: "#FBFAF7",
+                border: "1px solid rgba(31,29,26,.10)",
+                borderRadius: 4,
+                padding: 14,
+                marginBottom: 18,
+              }}
+            >
+              <p style={{ margin: "0 0 10px", fontSize: 13, color: "#6E6A62" }}>
+                Choose notes to move into this project.
+              </p>
+              {addableNotes.length ? (
+                <div className="flex flex-col gap-1">
+                  {addableNotes.map((n) => (
+                    <button
+                      key={n.id}
+                      type="button"
+                      onClick={() => void assignNoteToProject(n.id, projectId)}
+                      className="flex w-full items-center gap-3 text-left"
+                      style={{
+                        padding: "10px 8px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: "#fff",
+                        cursor: "pointer",
+                        fontSize: 13.5,
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 999,
+                          background: n.color,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span className="truncate flex-1">{n.text || "Empty note"}</span>
+                      <span className="font-mono" style={{ fontSize: 10, color: "#A29C90" }}>
+                        {hostnameOf(n.url)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ margin: 0, fontSize: 13, color: "#8B867C" }}>
+                  Every note is already in this project.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="note-grid-compact">
             {projectNotes.map((note, i) => (
               <NoteCard key={note.id} note={note} index={i} showDate={false} />
             ))}
           </div>
+          {!projectNotes.length && !pickerOpen && (
+            <p style={{ color: "#8B867C", fontSize: 14 }}>
+              No notes here yet. Use Add notes, or open a note and pick this project.
+            </p>
+          )}
         </section>
 
         <aside

@@ -20,8 +20,13 @@ import {
 import { useAuth } from "./auth";
 import { getDb } from "./firebase";
 import { DEMO_NOTES, DEMO_PROJECTS } from "./demo-data";
+import {
+  getSavedExtensionId,
+  isExtensionLinked,
+  pushNotesToExtension,
+} from "./extension-sync";
 import { buildExtractiveSummary } from "./summary";
-import type { Note, Project } from "./types";
+import { NOTE_COLORS, type Note, type Project } from "./types";
 
 type LibraryContextValue = {
   notes: Note[];
@@ -31,9 +36,18 @@ type LibraryContextValue = {
   upsertNote: (note: Note) => Promise<void>;
   deleteNote: (noteId: string) => Promise<void>;
   upsertProject: (project: Project) => Promise<void>;
+  createProject: (name: string) => Promise<Project>;
+  assignNoteToProject: (noteId: string, projectId: string | null) => Promise<void>;
   refreshProjectSummary: (projectId: string) => Promise<void>;
   importNotes: (notes: Note[]) => Promise<void>;
 };
+
+async function mirrorNotesToExtension(notesToPush: Note[]) {
+  if (typeof window === "undefined" || !isExtensionLinked()) return;
+  const extensionId = getSavedExtensionId();
+  if (!extensionId || !notesToPush.length) return;
+  await pushNotesToExtension(extensionId, notesToPush);
+}
 
 const LibraryContext = createContext<LibraryContextValue | null>(null);
 
@@ -83,11 +97,13 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           copy[i] = note;
           return copy;
         });
+        void mirrorNotesToExtension([note]);
         return;
       }
       await setDoc(doc(getDb(), "users", user.uid, "notes", note.id), note, {
         merge: true,
       });
+      void mirrorNotesToExtension([note]);
     },
     [user],
   );
@@ -120,6 +136,38 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       });
     },
     [user],
+  );
+
+  const createProject = useCallback(
+    async (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error("Project name required");
+      const project: Project = {
+        id: `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+        name: trimmed,
+        color: NOTE_COLORS[projects.length % NOTE_COLORS.length],
+        summary: null,
+        tags: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      await upsertProject(project);
+      return project;
+    },
+    [projects.length, upsertProject],
+  );
+
+  const assignNoteToProject = useCallback(
+    async (noteId: string, projectId: string | null) => {
+      const note = notes.find((n) => n.id === noteId);
+      if (!note) return;
+      await upsertNote({
+        ...note,
+        projectId,
+        updatedAt: Date.now(),
+      });
+    },
+    [notes, upsertNote],
   );
 
   const refreshProjectSummary = useCallback(
@@ -171,6 +219,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       upsertNote,
       deleteNote,
       upsertProject,
+      createProject,
+      assignNoteToProject,
       refreshProjectSummary,
       importNotes,
     }),
@@ -182,6 +232,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       upsertNote,
       deleteNote,
       upsertProject,
+      createProject,
+      assignNoteToProject,
       refreshProjectSummary,
       importNotes,
     ],

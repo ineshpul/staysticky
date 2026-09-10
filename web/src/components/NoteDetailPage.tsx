@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { AppShell } from "./AppShell";
 import { useLibrary } from "@/lib/library";
 import { NOTE_COLORS } from "@/lib/types";
@@ -9,7 +10,9 @@ import { formatShortDate, hostnameOf } from "@/lib/utils";
 
 export function NoteDetailPage({ noteId }: { noteId: string }) {
   const router = useRouter();
-  const { notes, projects, upsertNote } = useLibrary();
+  const { notes, projects, upsertNote, createProject, assignNoteToProject } = useLibrary();
+  const [creating, setCreating] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
   const note = notes.find((n) => n.id === noteId);
   const project = projects.find((p) => p.id === note?.projectId);
   const related = notes
@@ -29,6 +32,23 @@ export function NoteDetailPage({ noteId }: { noteId: string }) {
         </button>
       </AppShell>
     );
+  }
+
+  async function onProjectChange(value: string) {
+    if (value === "__new__") {
+      setCreating(true);
+      return;
+    }
+    await assignNoteToProject(note!.id, value || null);
+  }
+
+  async function submitNewProject() {
+    const name = newProjectName.trim();
+    if (!name) return;
+    const created = await createProject(name);
+    await assignNoteToProject(note!.id, created.id);
+    setNewProjectName("");
+    setCreating(false);
   }
 
   return (
@@ -103,6 +123,63 @@ export function NoteDetailPage({ noteId }: { noteId: string }) {
             >
               {note.text || "Empty note"}
             </p>
+          </div>
+
+          <div style={{ marginTop: 18, maxWidth: 340 }}>
+            <label
+              style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 8 }}
+            >
+              Project
+            </label>
+            <select
+              value={creating ? "__new__" : note.projectId || ""}
+              onChange={(e) => void onProjectChange(e.target.value)}
+              style={{
+                width: "100%",
+                border: "1px solid rgba(31,29,26,.16)",
+                borderRadius: 8,
+                padding: "10px 12px",
+                background: "#FBFAF7",
+                fontSize: 13.5,
+              }}
+            >
+              <option value="">Ungrouped</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+              <option value="__new__">+ New project…</option>
+            </select>
+            {creating && (
+              <div className="flex flex-wrap gap-2" style={{ marginTop: 10 }}>
+                <input
+                  autoFocus
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void submitNewProject();
+                    if (e.key === "Escape") setCreating(false);
+                  }}
+                  placeholder="Project name"
+                  style={{
+                    flex: 1,
+                    minWidth: 140,
+                    border: "1px solid rgba(31,29,26,.16)",
+                    borderRadius: 8,
+                    padding: "10px 12px",
+                    background: "#fff",
+                    fontSize: 13.5,
+                  }}
+                />
+                <button type="button" className="btn-dark" onClick={() => void submitNewProject()}>
+                  Create
+                </button>
+                <button type="button" className="btn-ghost" onClick={() => setCreating(false)}>
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-2" style={{ marginTop: 16 }}>
