@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { LandingHeader } from "./LandingHeader";
+import { getExtensionInstallHref, isChromeStoreLinked } from "@/lib/extension";
 
 export function LandingPage() {
   const { user, signIn } = useAuth();
+  const installHref = getExtensionInstallHref();
+  const storeLive = isChromeStoreLinked();
 
   return (
     <div
@@ -62,17 +65,15 @@ export function LandingPage() {
                 Open my library
               </button>
             )}
-            <a
-              className="btn-ghost"
-              href={
-                process.env.NEXT_PUBLIC_CHROME_STORE_URL ||
-                "https://github.com/ineshpul/staysticky#install-the-extension-unpacked"
-              }
-              target="_blank"
-              rel="noreferrer"
-            >
-              Add to Chrome
-            </a>
+            {storeLive ? (
+              <a className="btn-ghost" href={installHref} target="_blank" rel="noreferrer">
+                Add to Chrome
+              </a>
+            ) : (
+              <Link className="btn-ghost" href={installHref}>
+                Add to Chrome
+              </Link>
+            )}
           </div>
         </div>
 

@@ -217,7 +217,7 @@ function EmptyNotes() {
         It shows up here the moment you sync.
       </p>
       <div className="flex flex-wrap justify-center gap-3">
-        <a className="btn-dark" href="https://github.com/ineshpul/staysticky" target="_blank" rel="noreferrer">
+        <a className="btn-dark" href="/install">
           Pin the extension
         </a>
         <Link href="/notes" className="btn-ghost">
