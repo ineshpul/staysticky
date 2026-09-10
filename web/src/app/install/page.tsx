@@ -66,9 +66,9 @@ export default function InstallPage() {
             </li>
             <li>Pin Stay Sticky from the puzzle icon.</li>
             <li>
-              Come back here →{" "}
-              <Link href="/account" style={{ textDecoration: "underline" }}>
-                Account & sync
+              Come back here and open{" "}
+              <Link href="/onboarding" style={{ textDecoration: "underline" }}>
+                setup
               </Link>{" "}
               → paste your extension ID from <code>chrome://extensions</code> → Connect once
               (auto-sync stays on after that).
@@ -82,8 +82,8 @@ export default function InstallPage() {
       )}
 
       <div className="flex flex-wrap gap-3" style={{ marginTop: 28 }}>
-        <Link href="/notes" className="btn-dark">
-          Open my library
+        <Link href="/onboarding" className="btn-dark">
+          Continue setup
         </Link>
         <Link href="/how-it-works" className="btn-ghost">
           How it works

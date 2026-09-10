@@ -81,7 +81,8 @@ export function AccountPage() {
   function unlink() {
     clearExtensionLink();
     setLinked(false);
-    setStatus("Unlinked. Pasting the same ID and connecting again will re-enable auto-sync.");
+    setStatus("Unlinked. You’ll need to connect again before the library opens.");
+    window.location.href = "/onboarding";
   }
 
   return (

@@ -102,8 +102,8 @@ export function HowItWorksPage() {
                   Next
                 </button>
               ) : (
-                <Link href="/notes" className="btn-dark">
-                  Open library
+                <Link href="/onboarding" className="btn-dark">
+                  Get started
                 </Link>
               )}
             </div>

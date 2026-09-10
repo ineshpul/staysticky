@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { useLibrary } from "@/lib/library";
 import { formatRelative } from "@/lib/utils";
 import { projectsWithNotes } from "@/lib/summary";
+import { useExtensionLink } from "@/lib/use-extension-link";
 
 function parentPath(pathname: string): string | null {
   if (pathname.startsWith("/n/")) return "/notes";
@@ -19,8 +20,9 @@ function parentPath(pathname: string): string | null {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, profile, loading, signIn } = useAuth();
-  const { notes, projects, usingDemo, lastSyncedAt, createProject } = useLibrary();
+  const { user, profile, loading } = useAuth();
+  const { notes, projects, lastSyncedAt, createProject } = useLibrary();
+  const { linked, ready: linkReady } = useExtensionLink();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
@@ -37,6 +39,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setDrawerOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (loading || !linkReady) return;
+    if (!user || !linked) {
+      const next = encodeURIComponent(pathname || "/notes");
+      router.replace(`/onboarding?next=${next}`);
+    }
+  }, [loading, linkReady, user, linked, pathname, router]);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 901px)");
@@ -76,20 +86,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const backTo = parentPath(pathname);
 
-  if (loading) {
+  if (loading || !linkReady || !user || !linked) {
     return (
       <div className="min-h-screen grid place-items-center" style={{ color: "#6E6A62" }}>
-        Loading library…
-      </div>
-    );
-  }
-
-  if (!user && !usingDemo) {
-    return (
-      <div className="min-h-screen grid place-items-center p-8">
-        <button type="button" className="btn-dark" onClick={() => void signIn()}>
-          Sign in to continue
-        </button>
+        {loading || !linkReady ? "Loading library…" : "Taking you to setup…"}
       </div>
     );
   }
@@ -350,14 +350,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </span>
         <span className="min-w-0">
           <div style={{ fontSize: 13.5, fontWeight: 500 }} className="truncate">
-            {profile?.displayName || (usingDemo ? "Demo library" : "Reader")}
+            {profile?.displayName || "Reader"}
           </div>
           <div className="font-mono" style={{ fontSize: 10, color: "#8B867C" }}>
-            {usingDemo
-              ? "preview data"
-              : lastSyncedAt
-                ? `synced ${formatRelative(lastSyncedAt)}`
-                : "waiting for sync"}
+            {lastSyncedAt ? `synced ${formatRelative(lastSyncedAt)}` : "waiting for sync"}
           </div>
         </span>
       </button>
@@ -419,24 +415,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
         </div>
 
-        {usingDemo && (
-          <div
-            className="mb-5 flex flex-wrap items-center justify-between gap-3"
-            style={{
-              background: "#FBFAF7",
-              border: "1px solid rgba(31,29,26,.10)",
-              borderRadius: 4,
-              padding: "12px 14px",
-              fontSize: 13.5,
-              color: "#4A463F",
-            }}
-          >
-            <span>Browsing example notes. Sign in to sync your extension library.</span>
-            <button type="button" className="btn-dark" onClick={() => void signIn()}>
-              Sign in
-            </button>
-          </div>
-        )}
         {children}
       </main>
     </div>

@@ -222,8 +222,8 @@ function EmptyNotes() {
         <a className="btn-dark" href="/install">
           Pin the extension
         </a>
-        <Link href="/notes" className="btn-ghost">
-          See an example library
+        <Link href="/account" className="btn-ghost">
+          Check sync
         </Link>
       </div>
     </div>

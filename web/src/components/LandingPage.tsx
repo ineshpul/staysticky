@@ -4,11 +4,14 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { LandingHeader } from "./LandingHeader";
 import { getExtensionInstallHref, isChromeStoreLinked } from "@/lib/extension";
+import { libraryEntryHref, useExtensionLink } from "@/lib/use-extension-link";
 
 export function LandingPage() {
-  const { user, signIn } = useAuth();
+  const { user } = useAuth();
+  const { linked, ready } = useExtensionLink();
   const installHref = getExtensionInstallHref();
   const storeLive = isChromeStoreLinked();
+  const startHref = ready ? libraryEntryHref(Boolean(user), linked) : "/onboarding";
 
   return (
     <div className="marketing-wrap">
@@ -42,15 +45,9 @@ export function LandingPage() {
             from.
           </p>
           <div className="flex flex-wrap gap-3">
-            {user ? (
-              <Link href="/notes" className="btn-dark">
-                Open my library
-              </Link>
-            ) : (
-              <button type="button" className="btn-dark" onClick={() => void signIn()}>
-                Open my library
-              </button>
-            )}
+            <Link href={startHref} className="btn-dark">
+              {user && linked ? "Open my library" : "Get started"}
+            </Link>
             {storeLive ? (
               <a className="btn-ghost" href={installHref} target="_blank" rel="noreferrer">
                 Add to Chrome
