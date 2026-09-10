@@ -38,6 +38,8 @@ function notesArray(notesMap) {
     archived: Boolean(note.archived),
     anchorText: note.anchorText || null,
     snapshotUrl: note.snapshotUrl || null,
+    sourceAuthor: note.sourceAuthor || null,
+    sourcePublishedAt: note.sourcePublishedAt || null,
   }));
 }
 

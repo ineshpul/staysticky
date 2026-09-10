@@ -282,7 +282,65 @@
     return chip;
   }
 
+  function scrapePageCitationMeta() {
+    function metaContent(...names) {
+      for (const name of names) {
+        const el =
+          document.querySelector(`meta[name="${name}"]`) ||
+          document.querySelector(`meta[property="${name}"]`) ||
+          document.querySelector(`meta[itemprop="${name}"]`);
+        const value = el && el.getAttribute("content");
+        if (value && value.trim()) return value.trim();
+      }
+      return null;
+    }
+
+    function normalizeDate(raw) {
+      if (!raw) return null;
+      const trimmed = String(raw).trim();
+      if (/^\d{4}$/.test(trimmed)) return trimmed;
+      if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10);
+      const parsed = new Date(trimmed);
+      if (Number.isNaN(parsed.getTime())) return null;
+      const y = parsed.getUTCFullYear();
+      const m = String(parsed.getUTCMonth() + 1).padStart(2, "0");
+      const d = String(parsed.getUTCDate()).padStart(2, "0");
+      return y + "-" + m + "-" + d;
+    }
+
+    const author =
+      metaContent(
+        "author",
+        "citation_author",
+        "article:author",
+        "dc.creator",
+        "DC.creator",
+        "twitter:creator"
+      ) ||
+      (document.querySelector('[rel="author"]') &&
+        document.querySelector('[rel="author"]').textContent &&
+        document.querySelector('[rel="author"]').textContent.trim()) ||
+      null;
+
+    const publishedRaw = metaContent(
+      "article:published_time",
+      "citation_publication_date",
+      "pubdate",
+      "publishdate",
+      "date",
+      "dc.date",
+      "DC.date",
+      "sailthru.date"
+    );
+
+    return {
+      sourceAuthor: author ? author.replace(/^by\s+/i, "").trim() : null,
+      sourcePublishedAt: normalizeDate(publishedRaw),
+    };
+  }
+
   function createNewNote() {
+    const citation = scrapePageCitationMeta();
     const note = {
       id: ssGenerateId(),
       pageKey,
@@ -300,6 +358,8 @@
       projectId: null,
       tags: [],
       archived: false,
+      sourceAuthor: citation.sourceAuthor,
+      sourcePublishedAt: citation.sourcePublishedAt,
     };
     ssSaveNote(note, () => {
       const el = renderCard(note);
