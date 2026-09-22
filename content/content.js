@@ -4,6 +4,135 @@
 // with the same text every time this page is revisited.
 
 (function () {
+  function isCompanionSite() {
+    try {
+      const u = new URL(location.href);
+      const localDev =
+        (u.hostname === 'localhost' || u.hostname === '127.0.0.1') && u.port === '3000';
+      return localDev || u.hostname.includes('staysticky');
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function notesList(notes) {
+    return Object.values(notes || {}).map((note) => ({
+      ...note,
+      projectId: note.projectId || null,
+      tags: note.tags || [],
+      archived: Boolean(note.archived),
+      anchorText: note.anchorText || null,
+      snapshotUrl: note.snapshotUrl || null,
+      sourceAuthor: note.sourceAuthor || null,
+      sourcePublishedAt: note.sourcePublishedAt || null,
+    }));
+  }
+
+  function projectsList(projects) {
+    return Object.values(projects || {}).map((project) => ({
+      id: project.id,
+      name: project.name || 'Untitled',
+      color: project.color || '#FFF59D',
+      summary: project.summary || null,
+      tags: Array.isArray(project.tags) ? project.tags : [],
+      createdAt: Number(project.createdAt) || Date.now(),
+      updatedAt: Number(project.updatedAt) || Date.now(),
+    }));
+  }
+
+  function replyToWeb(requestId, payload) {
+    window.postMessage(
+      { source: 'staysticky-extension', requestId, ...payload },
+      location.origin,
+    );
+  }
+
+  function handleWebMessage(data) {
+    const type = data.type;
+    if (type === 'SS_WEB_GET_NOTES' || type === 'SS_WEB_REQUEST_SYNC') {
+      ssGetAllNotes((notes) => {
+        ssGetAllProjects((projects) => {
+          replyToWeb(data.requestId, {
+            ok: true,
+            message: 'Notes and projects loaded from extension storage.',
+            notes: notesList(notes),
+            projects: projectsList(projects),
+          });
+        });
+      });
+      return;
+    }
+    if (type === 'SS_WEB_UPSERT_NOTES') {
+      const incoming = Array.isArray(data.notes) ? data.notes : [];
+      ssGetAllNotes((notes) => {
+        incoming.forEach((n) => {
+          if (!n || !n.id) return;
+          notes[n.id] = { ...(notes[n.id] || {}), ...n, id: n.id };
+        });
+        chrome.storage.local.set({ notes }, () => {
+          replyToWeb(data.requestId, { ok: true, message: 'Updated notes.' });
+        });
+      });
+      return;
+    }
+    if (type === 'SS_WEB_UPSERT_PROJECTS') {
+      const incoming = Array.isArray(data.projects) ? data.projects : [];
+      ssGetAllProjects((projects) => {
+        incoming.forEach((p) => {
+          if (!p || !p.id) return;
+          projects[p.id] = { ...(projects[p.id] || {}), ...p, id: p.id };
+        });
+        chrome.storage.local.set({ projects }, () => {
+          replyToWeb(data.requestId, { ok: true, message: 'Updated projects.' });
+        });
+      });
+      return;
+    }
+    if (type === 'SS_WEB_DELETE_NOTE' && data.noteId) {
+      ssDeleteNote(data.noteId, () => {
+        replyToWeb(data.requestId, { ok: true, message: 'Note deleted.' });
+      });
+      return;
+    }
+    if (type === 'SS_WEB_DELETE_PROJECT' && data.projectId) {
+      ssDeleteProject(data.projectId, () => {
+        replyToWeb(data.requestId, { ok: true, message: 'Project deleted.' });
+      });
+      return;
+    }
+    replyToWeb(data.requestId, { ok: false, message: 'Unknown message type.' });
+  }
+
+  // The companion site cannot read chrome.storage directly. On Stay Sticky
+  // origins, expose notes over same-origin postMessage so new stickies sync
+  // even if the background worker is asleep.
+  if (isCompanionSite()) {
+    window.addEventListener('message', (event) => {
+      if (event.source !== window || event.origin !== location.origin) return;
+      const data = event.data;
+      if (!data || data.source !== 'staysticky-web' || !data.requestId) return;
+      handleWebMessage(data);
+    });
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || (!changes.notes && !changes.projects)) return;
+      ssGetAllNotes((notes) => {
+        ssGetAllProjects((projects) => {
+          window.postMessage(
+            {
+              source: 'staysticky-extension',
+              type: 'SS_EXTENSION_CHANGED',
+              ok: true,
+              notes: notesList(notes),
+              projects: projectsList(projects),
+            },
+            location.origin,
+          );
+        });
+      });
+    });
+    return;
+  }
+
   const COLORS = ['#FFF59D', '#F8BBD0', '#BBDEFB', '#C8E6C9', '#FFE0B2'];
   const DEFAULT_WIDTH = 220;
   const DEFAULT_HEIGHT = 190;
@@ -14,6 +143,8 @@
   const notesOnPage = {}; // id -> card element
   const minimizedChips = {}; // id -> chip element
   let tray = null;
+  let quickAdd = null;
+  let pageInvoked = false;
 
   function debounce(fn, wait) {
     let t;
@@ -23,12 +154,53 @@
     };
   }
 
+  function markPageInvoked() {
+    pageInvoked = true;
+    ensureQuickAdd();
+  }
+
+  function pageHasNotes() {
+    return Object.keys(notesOnPage).length > 0 || Object.keys(minimizedChips).length > 0;
+  }
+
+  /** Little sticky in the top-right after Stay Sticky is used on this page. */
+  function ensureQuickAdd() {
+    if (!pageInvoked && !pageHasNotes()) return;
+    if (quickAdd && document.body.contains(quickAdd)) {
+      quickAdd.hidden = false;
+      syncTrayOffset();
+      return;
+    }
+    quickAdd = document.createElement('button');
+    quickAdd.type = 'button';
+    quickAdd.id = 'ss-quick-add';
+    quickAdd.className = 'ss-quick-add';
+    quickAdd.title = 'Add sticky note';
+    quickAdd.setAttribute('aria-label', 'Add sticky note');
+    quickAdd.innerHTML =
+      '<span class="ss-quick-add-bar" aria-hidden="true"></span>' +
+      '<span class="ss-quick-add-plus" aria-hidden="true">+</span>';
+    quickAdd.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      createNewNote();
+    });
+    document.body.appendChild(quickAdd);
+    syncTrayOffset();
+  }
+
+  function syncTrayOffset() {
+    if (!tray) return;
+    tray.classList.toggle('ss-tray-with-quick-add', Boolean(quickAdd && !quickAdd.hidden));
+  }
+
   function getTray() {
     if (tray) return tray;
     tray = document.createElement('div');
     tray.id = 'ss-tray';
     tray.className = 'ss-tray';
     document.body.appendChild(tray);
+    syncTrayOffset();
     return tray;
   }
 
@@ -340,6 +512,7 @@
   }
 
   function createNewNote() {
+    markPageInvoked();
     const citation = scrapePageCitationMeta();
     const note = {
       id: ssGenerateId(),
@@ -369,9 +542,9 @@
 
   function loadNotesForPage() {
     ssGetAllNotes((all) => {
-      Object.values(all)
-        .filter((n) => n.pageKey === pageKey)
-        .forEach(renderNote);
+      const onPage = Object.values(all).filter((n) => n.pageKey === pageKey);
+      onPage.forEach(renderNote);
+      if (onPage.length) markPageInvoked();
     });
   }
 
@@ -411,6 +584,12 @@
     Object.values(newNotes)
       .filter((n) => n.pageKey === pageKey && !notesOnPage[n.id] && !minimizedChips[n.id])
       .forEach(renderNote);
+
+    if (Object.values(newNotes).some((n) => n.pageKey === pageKey)) {
+      markPageInvoked();
+    } else {
+      syncTrayOffset();
+    }
   });
 
   loadNotesForPage();

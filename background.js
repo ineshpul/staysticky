@@ -198,7 +198,7 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
   }
 
   if (message?.type === "SS_WEB_PING") {
-    sendResponse({ ok: true, message: "Stay Sticky extension online.", version: "1.2.0" });
+    sendResponse({ ok: true, message: "Stay Sticky extension online.", version: "1.2.4" });
     return false;
   }
 
