@@ -1,5 +1,11 @@
 # Stay Sticky
 
+[![Live library](https://img.shields.io/badge/Live-staysticky--web.vercel.app-111?style=for-the-badge)](https://staysticky-web.vercel.app)
+
+<p align="center">
+  <img src="docs/hero.png" alt="Stay Sticky landing page: pin notes on the page you are reading, then gather them in one library" width="880">
+</p>
+
 Chrome extension that pins sticky notes to any webpage, plus a companion web
 library that gathers every note into one place.
 
