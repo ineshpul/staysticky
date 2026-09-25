@@ -1,17 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LandingHeader } from "@/components/LandingHeader";
 import { useAuth } from "@/lib/auth";
 import { useLibrary } from "@/lib/library";
-import { getExtensionInstallHref, isChromeStoreLinked } from "@/lib/extension";
+import { CHROME_STORE_URL, getExtensionInstallHref } from "@/lib/extension";
 import {
-  fetchFromExtension,
-  mergeIncomingNote,
-  mergeIncomingProject,
-  saveExtensionLink,
+  connectToExtension,
+  humanizeExtensionError,
+  mergeExtensionImport,
+  shouldAutoLinkExtension,
 } from "@/lib/extension-sync";
 import { useExtensionLink } from "@/lib/use-extension-link";
 
@@ -21,34 +20,53 @@ export function OnboardingPage() {
   const nextPath = search.get("next") || "/notes";
   const { user, loading, signIn } = useAuth();
   const { notes, importNotes, importProjects } = useLibrary();
-  const { linked, extensionId, setExtensionId, ready, refresh } = useExtensionLink();
-  const [installedAck, setInstalledAck] = useState(false);
+  const { linked, ready, refresh } = useExtensionLink();
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const autoTried = useRef(false);
 
-  const storeLive = isChromeStoreLinked();
   const installHref = getExtensionInstallHref();
 
   useEffect(() => {
     if (!ready || loading) return;
     if (user && linked) {
-      // Already set up — skip straight into the library.
       router.replace(nextPath.startsWith("/") ? nextPath : "/notes");
     }
   }, [ready, loading, user, linked, nextPath, router]);
 
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+
+  async function ingest(): Promise<{ ok: boolean; message: string; imported: number }> {
+    const res = await connectToExtension();
+    if (!res.ok) return { ok: false, message: res.message, imported: 0 };
+    refresh();
+    const { notes: merged, projects } = mergeExtensionImport(
+      notesRef.current,
+      res.notes,
+      res.projects,
+    );
+    await importNotes(merged);
+    if (projects.length) await importProjects(projects);
+    return { ok: true, message: res.message, imported: merged.length };
+  }
+
+  useEffect(() => {
+    if (!ready || loading || !user || linked || autoTried.current) return;
+    if (!shouldAutoLinkExtension()) return;
+    autoTried.current = true;
+    void ingest();
+    // Probe once after sign-in; ingest reads the latest notes via notesRef.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, loading, user, linked]);
+
   const step = useMemo(() => {
     if (!user) return 1;
-    if (!linked && !installedAck) return 2;
-    if (!linked) return 3;
-    return 4;
-  }, [user, linked, installedAck]);
+    if (!linked) return 2;
+    return 3;
+  }, [user, linked]);
 
   async function connect() {
-    if (!extensionId.trim()) {
-      setStatus("Paste your extension ID from chrome://extensions.");
-      return;
-    }
     if (!user) {
       await signIn();
       return;
@@ -56,34 +74,12 @@ export function OnboardingPage() {
     setBusy(true);
     setStatus("Connecting…");
     try {
-      const id = extensionId.trim();
-      const res = await fetchFromExtension(id);
+      const res = await ingest();
       if (!res.ok) {
-        setStatus(
-          res.message ||
-            "Could not reach the extension. Open this site in Chrome with Stay Sticky installed.",
-        );
+        setStatus(humanizeExtensionError(res.message));
         return;
       }
-      saveExtensionLink(id);
-      refresh();
-
-      const cloudById = new Map(notes.map((n) => [n.id, n]));
-      const merged = res.notes.map((incoming) =>
-        mergeIncomingNote(cloudById.get(incoming.id), incoming),
-      );
-      await importNotes(merged);
-
-      const referenced = new Set(
-        merged.map((n) => n.projectId).filter((id): id is string => Boolean(id)),
-      );
-      const projectsToImport = res.projects.filter((p) => referenced.has(p.id));
-      if (projectsToImport.length) {
-        await importProjects(
-          projectsToImport.map((incoming) => mergeIncomingProject(undefined, incoming)),
-        );
-      }
-      setStatus(`Linked. Imported ${merged.length} notes.`);
+      setStatus(`Linked. Imported ${res.imported} notes.`);
     } finally {
       setBusy(false);
     }
@@ -120,12 +116,7 @@ export function OnboardingPage() {
       <button
         type="button"
         onClick={() => {
-          if (step === 3 && installedAck && !linked) {
-            setInstalledAck(false);
-            setStatus("");
-            return;
-          }
-          if (step === 2 && typeof window !== "undefined" && window.history.length > 1) {
+          if (typeof window !== "undefined" && window.history.length > 1) {
             router.back();
             return;
           }
@@ -163,8 +154,8 @@ export function OnboardingPage() {
         Get Stay Sticky working
       </h1>
       <p style={{ margin: "0 0 28px", fontSize: 16, lineHeight: 1.6, color: "#4A463F" }}>
-        The web library only shows notes from the Chrome extension. Finish these steps once — then
-        your notes stay synced.
+        Install the Chrome extension, sign in, and connect once. After that, notes sync into your
+        library automatically.
       </p>
 
       <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 14 }}>
@@ -188,42 +179,9 @@ export function OnboardingPage() {
 
         <Step
           n={2}
-          title="Add the Chrome extension"
-          done={linked || installedAck}
-          active={step === 2}
-          body={
-            <div>
-              <p style={{ margin: "0 0 14px", fontSize: 14, color: "#6E6A62", lineHeight: 1.55 }}>
-                Stay Sticky has to run in Chrome so notes can stick to the pages you read.
-              </p>
-              {storeLive ? (
-                <a className="btn-dark" href={installHref} target="_blank" rel="noreferrer">
-                  Add to Chrome
-                </a>
-              ) : (
-                <Link className="btn-dark" href="/install">
-                  Install guide
-                </Link>
-              )}
-              {!linked && (
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  style={{ marginLeft: 10 }}
-                  onClick={() => setInstalledAck(true)}
-                >
-                  I installed it
-                </button>
-              )}
-            </div>
-          }
-        />
-
-        <Step
-          n={3}
-          title="Link this site to your extension"
+          title="Install and connect the extension"
           done={linked}
-          active={step === 3}
+          active={step === 2}
           body={
             linked ? (
               <p style={{ margin: 0, fontSize: 14, color: "#6E6A62" }}>
@@ -231,37 +189,42 @@ export function OnboardingPage() {
               </p>
             ) : (
               <div>
-                <p style={{ margin: "0 0 12px", fontSize: 14, color: "#6E6A62", lineHeight: 1.55 }}>
-                  Open <code>chrome://extensions</code>, turn on Developer mode, copy the Stay Sticky
-                  ID, and paste it here.
+                <p style={{ margin: "0 0 14px", fontSize: 14, color: "#6E6A62", lineHeight: 1.55 }}>
+                  Add Stay Sticky from the Chrome Web Store, then connect it to this site. Stay in
+                  Chrome — the library talks to the extension in your browser.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <input
-                    value={extensionId}
-                    onChange={(e) => setExtensionId(e.target.value)}
-                    placeholder="Extension ID"
-                    style={{
-                      flex: 1,
-                      minWidth: 220,
-                      border: "1px solid rgba(31,29,26,.16)",
-                      borderRadius: 8,
-                      padding: "10px 12px",
-                      background: "#FBFAF7",
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 12,
-                    }}
-                  />
+                  <a
+                    className="btn-ghost"
+                    href={installHref}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Add to Chrome
+                  </a>
                   <button
                     type="button"
                     className="btn-dark"
-                    disabled={busy}
+                    disabled={busy || !user}
                     onClick={() => void connect()}
                   >
                     {busy ? "Connecting…" : "Connect extension"}
                   </button>
                 </div>
+                {!user && (
+                  <p style={{ margin: "12px 0 0", fontSize: 13, color: "#8B867C" }}>
+                    Sign in first, then connect.
+                  </p>
+                )}
                 {status && (
-                  <p style={{ margin: "12px 0 0", fontSize: 13, color: "#4A463F" }}>{status}</p>
+                  <p style={{ margin: "12px 0 0", fontSize: 13, color: "#4A463F" }}>
+                    {status}{" "}
+                    {status.includes("reachable") ? (
+                      <a href={CHROME_STORE_URL} target="_blank" rel="noreferrer">
+                        Open the listing
+                      </a>
+                    ) : null}
+                  </p>
                 )}
               </div>
             )
@@ -269,10 +232,10 @@ export function OnboardingPage() {
         />
 
         <Step
-          n={4}
+          n={3}
           title="Open your library"
           done={linked}
-          active={step === 4}
+          active={step === 3}
           body={
             linked ? (
               <button
@@ -284,7 +247,7 @@ export function OnboardingPage() {
               </button>
             ) : (
               <p style={{ margin: 0, fontSize: 14, color: "#8B867C" }}>
-                Finish linking first — the library stays locked until the extension is connected.
+                Finish connecting first — the library stays locked until the extension is linked.
               </p>
             )
           }

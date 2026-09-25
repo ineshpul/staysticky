@@ -11,7 +11,7 @@ const SLIDES = [
   },
   {
     title: "Sync to your library",
-    body: "Sign in on the web, link the extension from Account & sync, and every note pushes to Firebase under your account — free on Spark, no paid AI required.",
+    body: "Sign in on the web, connect the Chrome Web Store extension once, and every note syncs to your library — free on Spark, no paid AI required.",
   },
   {
     title: "Browse by project, site, or search",

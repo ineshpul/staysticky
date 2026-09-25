@@ -2,12 +2,9 @@
 
 import Link from "next/link";
 import { LandingHeader } from "@/components/LandingHeader";
-import { isChromeStoreLinked } from "@/lib/extension";
+import { CHROME_STORE_URL } from "@/lib/extension";
 
 export default function InstallPage() {
-  const storeLive = isChromeStoreLinked();
-  const storeUrl = process.env.NEXT_PUBLIC_CHROME_STORE_URL;
-
   return (
     <div className="marketing-wrap">
       <LandingHeader />
@@ -31,55 +28,13 @@ export default function InstallPage() {
         Add Stay Sticky to Chrome
       </h1>
       <p style={{ margin: "0 0 28px", fontSize: 16, lineHeight: 1.6, color: "#4A463F" }}>
-        {storeLive
-          ? "Install from the Chrome Web Store, then come back here to open your library and connect sync."
-          : "The Chrome Web Store listing is still in review. Until it is live, install the unpacked extension from this project (same build you submitted)."}
+        Install from the Chrome Web Store, then come back here to sign in and connect. The library
+        talks to that same published extension — no developer mode or ID copying.
       </p>
 
-      {storeLive && storeUrl ? (
-        <a className="btn-dark" href={storeUrl} target="_blank" rel="noreferrer">
-          Open Chrome Web Store
-        </a>
-      ) : (
-        <div
-          style={{
-            background: "#fff",
-            border: "1px solid rgba(31,29,26,.10)",
-            borderRadius: 4,
-            padding: 24,
-          }}
-        >
-          <ol style={{ margin: 0, paddingLeft: 20, color: "#4A463F", fontSize: 15, lineHeight: 1.7 }}>
-            <li>
-              Download the extension package:{" "}
-              <a
-                href="https://github.com/ineshpul/staysticky/archive/refs/heads/main.zip"
-                style={{ color: "#1F1D1A", textDecoration: "underline" }}
-              >
-                staysticky main.zip
-              </a>
-            </li>
-            <li>Unzip it. Use the folder that contains <code>manifest.json</code> (repo root).</li>
-            <li>
-              Open <code>chrome://extensions</code> → turn on <strong>Developer mode</strong> →{" "}
-              <strong>Load unpacked</strong> → select that folder.
-            </li>
-            <li>Pin Stay Sticky from the puzzle icon.</li>
-            <li>
-              Come back here and open{" "}
-              <Link href="/onboarding" style={{ textDecoration: "underline" }}>
-                setup
-              </Link>{" "}
-              → paste your extension ID from <code>chrome://extensions</code> → Connect once
-              (auto-sync stays on after that).
-            </li>
-          </ol>
-          <p style={{ margin: "18px 0 0", fontSize: 13.5, color: "#8B867C" }}>
-            After the Store listing is approved, this page will send people straight to the one-click
-            install.
-          </p>
-        </div>
-      )}
+      <a className="btn-dark" href={CHROME_STORE_URL} target="_blank" rel="noreferrer">
+        Open Chrome Web Store
+      </a>
 
       <div className="flex flex-wrap gap-3" style={{ marginTop: 28 }}>
         <Link href="/onboarding" className="btn-dark">
@@ -89,6 +44,15 @@ export default function InstallPage() {
           How it works
         </Link>
       </div>
+
+      <p style={{ margin: "36px 0 0", fontSize: 13, color: "#8B867C", lineHeight: 1.6 }}>
+        Building from source? Load this repo unpacked in{" "}
+        <code>chrome://extensions</code>, then use{" "}
+        <Link href="/account" style={{ textDecoration: "underline" }}>
+          Account & sync
+        </Link>{" "}
+        → “Using a local unpacked build?” to connect that ID.
+      </p>
     </div>
   );
 }

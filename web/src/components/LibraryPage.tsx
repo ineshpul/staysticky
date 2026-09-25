@@ -8,6 +8,7 @@ import { NoteCard } from "./NoteCard";
 import { useLibrary } from "@/lib/library";
 import { withProjectCounts } from "@/lib/summary";
 import { groupNotesByDate, groupNotesBySite } from "@/lib/utils";
+import { getExtensionInstallHref } from "@/lib/extension";
 import type { GroupBy } from "@/lib/types";
 
 export function LibraryPage({
@@ -219,7 +220,7 @@ function EmptyNotes() {
         It shows up here the moment you sync.
       </p>
       <div className="flex flex-wrap justify-center gap-3">
-        <a className="btn-dark" href="/install">
+        <a className="btn-dark" href={getExtensionInstallHref()} target="_blank" rel="noreferrer">
           Pin the extension
         </a>
         <Link href="/account" className="btn-ghost">

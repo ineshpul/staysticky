@@ -4,16 +4,19 @@ import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useLibrary } from "@/lib/library";
+import { useExtensionLink } from "@/lib/use-extension-link";
 import {
-  fetchFromExtension,
   getSavedExtensionId,
-  isExtensionLinked,
   mergeIncomingNote,
   mergeIncomingProject,
+  pullExtensionSnapshot,
   pushProjectsToExtension,
+  saveExtensionLink,
+  subscribeToExtensionChanges,
 } from "@/lib/extension-sync";
+import type { Note, Project } from "@/lib/types";
 
-const POLL_MS = 12000;
+const POLL_MS = 4000;
 
 function referencedProjectIds(notes: { projectId: string | null }[]): Set<string> {
   return new Set(
@@ -25,6 +28,7 @@ function referencedProjectIds(notes: { projectId: string | null }[]): Set<string
  *  Projects that notes reference are imported; empty leftovers are pruned later. */
 export function ExtensionSync() {
   const { user, profile } = useAuth();
+  const { linked } = useExtensionLink();
   const { notes, projects, importNotes, importProjects } = useLibrary();
   const notesRef = useRef(notes);
   const projectsRef = useRef(projects);
@@ -34,48 +38,44 @@ export function ExtensionSync() {
   useEffect(() => {
     if (!user) return;
     if (profile && profile.settings.syncEnabled === false) return;
-    if (!isExtensionLinked()) return;
-
-    const extensionId = getSavedExtensionId();
-    if (!extensionId) return;
+    if (!linked) return;
 
     let cancelled = false;
 
-    async function pull() {
-      const res = await fetchFromExtension(extensionId);
+    async function applySnapshot(res: {
+      ok: boolean;
+      notes: Note[];
+      projects: Project[];
+      extensionId?: string;
+    }) {
       if (cancelled || !res.ok) return;
+      if (res.extensionId && res.extensionId !== getSavedExtensionId()) {
+        saveExtensionLink(res.extensionId);
+      }
 
       const cloudNotes = new Map(notesRef.current.map((n) => [n.id, n]));
       const mergedNotes = res.notes.map((incoming) =>
         mergeIncomingNote(cloudNotes.get(incoming.id), incoming),
       );
 
-      // Notes must land first so project refs exist before anything prunes.
       await importNotes(mergedNotes);
       if (cancelled) return;
 
       const referenced = referencedProjectIds(mergedNotes);
 
-      const byId = new Map<string, (typeof res.projects)[number]>();
+      const byId = new Map<string, Project>();
       for (const cloud of projectsRef.current) {
         if (referenced.has(cloud.id)) byId.set(cloud.id, cloud);
       }
       for (const incoming of res.projects) {
         if (!referenced.has(incoming.id)) continue;
-        byId.set(
-          incoming.id,
-          mergeIncomingProject(byId.get(incoming.id), incoming),
-        );
+        byId.set(incoming.id, mergeIncomingProject(byId.get(incoming.id), incoming));
       }
 
-      // Also keep extension projects that notes just pointed at, even if the
-      // project map was briefly missing (create-then-tag race).
       for (const note of mergedNotes) {
         if (!note.projectId || byId.has(note.projectId)) continue;
         const fromExt = res.projects.find((p) => p.id === note.projectId);
-        if (fromExt) {
-          byId.set(fromExt.id, fromExt);
-        }
+        if (fromExt) byId.set(fromExt.id, fromExt);
       }
 
       const mergedProjects = [...byId.values()];
@@ -83,16 +83,19 @@ export function ExtensionSync() {
         await importProjects(mergedProjects);
       }
 
-      // Push web/cloud project metadata back, but never wipe extension-only
-      // projects that are still referenced by local notes.
       const toPush = [
         ...projectsRef.current.filter((p) => referenced.has(p.id)),
         ...mergedProjects,
       ];
       const pushMap = new Map(toPush.map((p) => [p.id, p]));
       if (pushMap.size) {
-        await pushProjectsToExtension(extensionId, [...pushMap.values()]);
+        await pushProjectsToExtension(res.extensionId || "", [...pushMap.values()]);
       }
+    }
+
+    async function pull() {
+      const res = await pullExtensionSnapshot();
+      await applySnapshot(res);
     }
 
     void pull();
@@ -103,14 +106,18 @@ export function ExtensionSync() {
     };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVis);
+    const unsubscribe = subscribeToExtensionChanges((payload) => {
+      void applySnapshot({ ok: true, ...payload });
+    });
 
     return () => {
       cancelled = true;
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVis);
+      unsubscribe();
     };
-  }, [user, profile?.settings.syncEnabled, importNotes, importProjects]);
+  }, [user, linked, profile?.settings.syncEnabled, importNotes, importProjects]);
 
   return null;
 }

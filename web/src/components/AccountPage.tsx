@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "./AppShell";
 import { useAuth } from "@/lib/auth";
 import { useLibrary } from "@/lib/library";
+import { CHROME_STORE_URL, STORE_EXTENSION_ID } from "@/lib/extension";
 import {
-  fetchFromExtension,
+  connectToExtension,
   getSavedExtensionId,
+  humanizeExtensionError,
   isExtensionLinked,
-  mergeIncomingNote,
-  mergeIncomingProject,
-  saveExtensionLink,
+  mergeExtensionImport,
   clearExtensionLink,
 } from "@/lib/extension-sync";
 
@@ -21,6 +21,7 @@ export function AccountPage() {
   const [status, setStatus] = useState("");
   const [linked, setLinked] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     setExtensionId(getSavedExtensionId());
@@ -36,10 +37,6 @@ export function AccountPage() {
   const exportJson = useMemo(() => JSON.stringify(notes, null, 2), [notes]);
 
   async function connectExtension() {
-    if (!extensionId.trim()) {
-      setStatus("Paste your Chrome extension ID from chrome://extensions.");
-      return;
-    }
     if (!user) {
       setStatus("Sign in first so synced notes can be saved to your account.");
       await signIn();
@@ -49,32 +46,18 @@ export function AccountPage() {
     setBusy(true);
     setStatus("Connecting…");
     try {
-      const id = extensionId.trim();
-      const res = await fetchFromExtension(id);
+      const preferred = showAdvanced ? extensionId.trim() : STORE_EXTENSION_ID;
+      const res = await connectToExtension(preferred);
       setLinked(res.ok);
       if (!res.ok) {
-        setStatus(res.message);
+        setStatus(humanizeExtensionError(res.message));
         return;
       }
 
-      saveExtensionLink(id);
-      setLinked(true);
-
-      const cloudById = new Map(notes.map((n) => [n.id, n]));
-      const merged = res.notes.map((incoming) =>
-        mergeIncomingNote(cloudById.get(incoming.id), incoming),
-      );
+      setExtensionId(res.extensionId);
+      const { notes: merged, projects } = mergeExtensionImport(notes, res.notes, res.projects);
       await importNotes(merged);
-
-      const referenced = new Set(
-        merged.map((n) => n.projectId).filter((id): id is string => Boolean(id)),
-      );
-      const projectsToImport = res.projects.filter((p) => referenced.has(p.id));
-      if (projectsToImport.length) {
-        await importProjects(
-          projectsToImport.map((incoming) => mergeIncomingProject(undefined, incoming)),
-        );
-      }
+      if (projects.length) await importProjects(projects);
       setStatus(
         `Linked permanently. Imported ${merged.length} notes — Stay Sticky will keep syncing automatically.`,
       );
@@ -97,8 +80,8 @@ export function AccountPage() {
           Account & sync
         </h1>
         <p style={{ margin: "10px 0 28px", fontSize: 14.5, color: "#6E6A62" }}>
-          Link the extension once. After that, notes sync automatically whenever you open this
-          library — no need to reconnect each visit.
+          Link the Chrome Web Store extension once. After that, notes sync automatically whenever
+          you open this library.
         </p>
 
         <div
@@ -123,7 +106,7 @@ export function AccountPage() {
           <div className="min-w-0 flex-1">
             <div style={{ fontSize: 14.5, fontWeight: 600 }}>Stay Sticky for Chrome</div>
             <div className="font-mono" style={{ fontSize: 11, color: "#8B867C", marginTop: 4 }}>
-              v1.2.0 · {linked ? "auto-sync on" : "not linked"} ·{" "}
+              Chrome Web Store · {linked ? "auto-sync on" : "not linked"} ·{" "}
               {lastSyncedAt
                 ? `last sync ${new Date(lastSyncedAt).toLocaleTimeString()}`
                 : usingDemo
@@ -154,30 +137,20 @@ export function AccountPage() {
             marginBottom: 8,
           }}
         >
-          <label style={{ display: "block", fontSize: 14.5, fontWeight: 500, marginBottom: 8 }}>
-            Extension ID
-          </label>
+          <p style={{ margin: "0 0 12px", fontSize: 14.5, fontWeight: 500 }}>
+            {linked ? "Connected to the live extension" : "Connect the live extension"}
+          </p>
           <p style={{ margin: "0 0 12px", fontSize: 13, color: "#6E6A62" }}>
-            One-time setup: open chrome://extensions, enable Developer mode, copy the Stay Sticky
-            ID, then connect. We save the link in this browser so sync stays on.
+            {linked
+              ? "This browser is talking to the Stay Sticky you installed from the Chrome Web Store."
+              : "Install Stay Sticky from the Chrome Web Store if you haven’t, then connect. You don’t need to copy an extension ID."}
           </p>
           <div className="flex flex-wrap gap-2">
-            <input
-              value={extensionId}
-              onChange={(e) => setExtensionId(e.target.value)}
-              placeholder="abcdefghijklmnopqrstuvwxyz123456"
-              disabled={linked}
-              style={{
-                flex: 1,
-                minWidth: 220,
-                border: "1px solid rgba(31,29,26,.16)",
-                borderRadius: 8,
-                padding: "10px 12px",
-                background: linked ? "#F2F0EA" : "#FBFAF7",
-                fontFamily: "var(--font-mono)",
-                fontSize: 12,
-              }}
-            />
+            {!linked && (
+              <a className="btn-ghost" href={CHROME_STORE_URL} target="_blank" rel="noreferrer">
+                Chrome Web Store
+              </a>
+            )}
             {linked ? (
               <button type="button" className="btn-ghost" onClick={unlink}>
                 Unlink
@@ -201,6 +174,58 @@ export function AccountPage() {
               Auto-sync runs every few seconds while this site is open, and again whenever you
               return to the tab.
             </p>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            style={{
+              marginTop: 16,
+              padding: 0,
+              border: "none",
+              background: "none",
+              color: "#8B867C",
+              fontSize: 12.5,
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
+          >
+            {showAdvanced ? "Hide developer options" : "Using a local unpacked build?"}
+          </button>
+          {showAdvanced && (
+            <div style={{ marginTop: 12 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
+                Extension ID
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  value={extensionId}
+                  onChange={(e) => setExtensionId(e.target.value)}
+                  placeholder={STORE_EXTENSION_ID}
+                  disabled={linked}
+                  style={{
+                    flex: 1,
+                    minWidth: 220,
+                    border: "1px solid rgba(31,29,26,.16)",
+                    borderRadius: 8,
+                    padding: "10px 12px",
+                    background: linked ? "#F2F0EA" : "#FBFAF7",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 12,
+                  }}
+                />
+                {!linked && (
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    disabled={busy}
+                    onClick={() => void connectExtension()}
+                  >
+                    Connect this ID
+                  </button>
+                )}
+              </div>
+            </div>
           )}
         </div>
 

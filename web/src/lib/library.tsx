@@ -293,6 +293,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
   const importNotes = useCallback(
     async (incoming: Note[]) => {
+      if (!incoming.length) return;
       if (!user) {
         setNotes((prev) => {
           const map = new Map(prev.map((n) => [n.id, n]));
