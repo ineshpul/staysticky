@@ -157,7 +157,19 @@ export function normalizeExtensionNote(n: Record<string, unknown>): Note {
     snapshotUrl: (n.snapshotUrl as string) || null,
     sourceAuthor: (n.sourceAuthor as string) || null,
     sourcePublishedAt: (n.sourcePublishedAt as string) || null,
+    pdfAnchor: normalizePdfAnchor(n.pdfAnchor),
   };
+}
+
+function normalizePdfAnchor(value: unknown): Note["pdfAnchor"] {
+  if (!value || typeof value !== "object") return null;
+  const anchor = value as Record<string, unknown>;
+  const page = Number(anchor.page);
+  const xRatio = Number(anchor.xRatio);
+  const yRatio = Number(anchor.yRatio);
+  if (!Number.isFinite(page) || page < 1) return null;
+  if (!Number.isFinite(xRatio) || !Number.isFinite(yRatio)) return null;
+  return { page: Math.round(page), xRatio, yRatio };
 }
 
 export function normalizeExtensionProject(p: Record<string, unknown>): Project {

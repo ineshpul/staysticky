@@ -31,6 +31,12 @@ export type Note = {
   sourceAuthor?: string | null;
   /** Optional publication date as YYYY-MM-DD when known. */
   sourcePublishedAt?: string | null;
+  /** Position on a PDF page. Ratios are fractions of that page's width and height. */
+  pdfAnchor?: {
+    page: number;
+    xRatio: number;
+    yRatio: number;
+  } | null;
 };
 
 export type Project = {
