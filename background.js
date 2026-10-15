@@ -64,6 +64,70 @@ function isAllowedOrigin(origin) {
   );
 }
 
+const pdfViewerPorts = new Map();
+
+function tabPrefersEmbeddedPdf(url) {
+  if (!url) return false;
+  if (/^file:/i.test(url)) return true;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname;
+    if (/\.pdf$/i.test(parsed.pathname)) return true;
+    if (
+      host === "drive.google.com" ||
+      host === "drive.usercontent.google.com" ||
+      host.endsWith(".googleusercontent.com")
+    ) {
+      return true;
+    }
+    if (host === "docs.google.com" && (parsed.searchParams.has("id") || parsed.pathname.includes("/uc"))) {
+      return true;
+    }
+  } catch (err) {
+    return false;
+  }
+  return false;
+}
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== "ss-pdf") return;
+  const info = {
+    tabId: port.sender?.tab?.id,
+    embedded: false,
+    large: true,
+  };
+  pdfViewerPorts.set(port, info);
+  port.onMessage.addListener((message) => {
+    if (!message || message.type !== "meta") return;
+    info.embedded = Boolean(message.embedded);
+    info.large = Boolean(message.large);
+  });
+  port.onDisconnect.addListener(() => {
+    pdfViewerPorts.delete(port);
+  });
+});
+
+function deliverPdfNote(tabId, url) {
+  const entries = [...pdfViewerPorts.entries()].filter(([, info]) => info.tabId === tabId);
+  const topLevel = entries.find(([, info]) => !info.embedded);
+  if (topLevel) {
+    topLevel[0].postMessage({ type: "ADD_NOTE" });
+    return true;
+  }
+  if (!tabPrefersEmbeddedPdf(url)) return false;
+  const embedded = entries.filter(([, info]) => info.large);
+  const target = embedded[embedded.length - 1];
+  if (!target) return false;
+  target[0].postMessage({ type: "ADD_NOTE" });
+  return true;
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type !== "SS_ADD_NOTE_PDF") return false;
+  sendResponse({ ok: deliverPdfNote(message.tabId, message.url || sender?.tab?.url || "") });
+  return false;
+});
+
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
   const origin = sender?.origin || "";
   if (!isAllowedOrigin(origin)) {
@@ -198,7 +262,7 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
   }
 
   if (message?.type === "SS_WEB_PING") {
-    sendResponse({ ok: true, message: "Stay Sticky extension online.", version: "1.2.4" });
+    sendResponse({ ok: true, message: "Stay Sticky extension online.", version: "1.3.0" });
     return false;
   }
 

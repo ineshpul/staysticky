@@ -4,10 +4,51 @@
 function ssNormalizePageKey(url) {
   try {
     const u = new URL(url);
+    const host = u.hostname;
+    const driveFile = u.pathname.match(/\/file\/d\/([^/]+)/);
+    if (
+      driveFile &&
+      (host === 'drive.google.com' ||
+        host === 'drive.usercontent.google.com' ||
+        host.endsWith('.googleusercontent.com'))
+    ) {
+      return 'https://drive.google.com/file/d/' + driveFile[1];
+    }
+    const googleDoc = u.pathname.match(
+      /\/(document|spreadsheets|presentation|drawings)\/d\/([^/]+)/
+    );
+    if (googleDoc && host === 'docs.google.com') {
+      return u.origin + '/' + googleDoc[1] + '/d/' + googleDoc[2];
+    }
+    const id = u.searchParams.get('id') || u.searchParams.get('docid');
+    if (id && (host === 'drive.google.com' || host === 'drive.usercontent.google.com' || host.endsWith('.googleusercontent.com'))) {
+      return 'https://drive.google.com/file/d/' + id;
+    }
+    if (id && host === 'docs.google.com') {
+      return u.origin + u.pathname + '?id=' + id;
+    }
     return u.origin + u.pathname;
   } catch (e) {
     return url;
   }
+}
+
+// Older notes were keyed by the raw path (`/view`, `/edit`). Those still count
+// as the same file as the canonical key.
+function ssPageKeyAliases(url) {
+  const aliases = new Set([ssNormalizePageKey(url)]);
+  try {
+    const u = new URL(url);
+    if (
+      /\/file\/d\/[^/]+/.test(u.pathname) ||
+      /\/(document|spreadsheets|presentation|drawings)\/d\/[^/]+/.test(u.pathname)
+    ) {
+      aliases.add(u.origin + u.pathname);
+    }
+  } catch (e) {
+    /* keep the canonical key only */
+  }
+  return aliases;
 }
 
 function ssGenerateId() {

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Stay Sticky PDF</title>
+  <link rel="stylesheet" href="../content/content.css">
+  <link rel="stylesheet" href="viewer.css">
+</head>
+<body class="ss-pdf-body">
+  <div id="ss-pdf-app">
+    <header id="ss-pdf-bar">
+      <span id="ss-pdf-title">PDF</span>
+      <span id="ss-pdf-pages"></span>
+      <div class="ss-pdf-zoom">
+        <button id="ss-zoom-out" type="button" title="Zoom out" aria-label="Zoom out">−</button>
+        <span id="ss-zoom-label">100%</span>
+        <button id="ss-zoom-in" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+      </div>
+    </header>
+    <div id="ss-pdf-scroll">
+      <p id="ss-pdf-message">Opening PDF…</p>
+      <div id="ss-pdf-stage"></div>
+    </div>
+  </div>
+  <script src="../shared/utils.js"></script>
+  <script type="module" src="viewer.js"></script>
+</body>
+</html>
