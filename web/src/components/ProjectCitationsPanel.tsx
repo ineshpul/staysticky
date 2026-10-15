@@ -4,13 +4,11 @@ import { useMemo, useState } from "react";
 import type { Note } from "@/lib/types";
 import {
   CITATION_STYLES,
-  bibliographyToPlainText,
   buildProjectBibliography,
   normalizePublishedDate,
   type CitationStyleId,
 } from "@/lib/citations";
 import { useLibrary } from "@/lib/library";
-import { downloadBlob, slugifyProjectName } from "@/lib/project-export";
 
 type Props = {
   projectName: string;
@@ -26,6 +24,7 @@ export function ProjectCitationsPanel({ projectName, notes }: Props) {
   const [authorDraft, setAuthorDraft] = useState("");
   const [dateDraft, setDateDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const meta = CITATION_STYLES.find((s) => s.id === style)!;
   const entries = useMemo(
@@ -44,12 +43,17 @@ export function ProjectCitationsPanel({ projectName, notes }: Props) {
     }
   }
 
-  function downloadList() {
-    const body = bibliographyToPlainText(entries, style, projectName);
-    downloadBlob(
-      new Blob([body], { type: "text/plain;charset=utf-8" }),
-      `stay-sticky-${slugifyProjectName(projectName)}-${style}-citations.txt`,
-    );
+  async function downloadList() {
+    setError("");
+    setDownloading(true);
+    try {
+      const { downloadBibliographyDocx } = await import("@/lib/citations-docx");
+      await downloadBibliographyDocx(entries, style, projectName);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not create the Word file.");
+    } finally {
+      setDownloading(false);
+    }
   }
 
   function startEdit(sourceKey: string, author: string | null, publishedAt: string | null) {
@@ -116,10 +120,10 @@ export function ProjectCitationsPanel({ projectName, notes }: Props) {
           <button
             type="button"
             className="btn-dark"
-            disabled={!entries.length}
-            onClick={downloadList}
+            disabled={!entries.length || downloading}
+            onClick={() => void downloadList()}
           >
-            Download .txt
+            {downloading ? "Preparing…" : "Download .docx"}
           </button>
         </div>
       </div>
