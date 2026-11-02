@@ -146,6 +146,49 @@
   let quickAdd = null;
   let pageInvoked = false;
 
+  // A locked note is "universal": it shows on every page, not just the one
+  // it was created on. A note with stuck === false has been taken off every
+  // page and lives only in the bank until it's stuck somewhere again.
+  // (stuck is treated as true when absent, for notes saved before this flag existed.)
+  function belongsOnThisPage(note) {
+    if (note.stuck === false) return false;
+    return note.locked || note.pageKey === pageKey;
+  }
+
+  // Toggles lock state. Unlocking a note on a page other than its current
+  // home re-homes it here — lock it, carry it (minimized) to wherever you
+  // need it, then unlock to drop it on that page.
+  function toggleLock(note) {
+    note.locked = !note.locked;
+    if (!note.locked && note.pageKey !== pageKey) {
+      note.pageKey = pageKey;
+      note.url = location.href;
+      note.title = document.title;
+      note.x = Math.round(window.scrollX + 120);
+      note.y = Math.round(window.scrollY + 120);
+    }
+    note.updatedAt = Date.now();
+    ssSaveNote(note);
+  }
+
+  // Taking a note off a page never deletes it — it just drops back into the
+  // bank (unstuck) so it can be stuck onto a page again later. Permanent
+  // deletion only happens from the bank's trash icon (or the web library).
+  function unstickNote(note) {
+    if (notesOnPage[note.id]) {
+      notesOnPage[note.id].remove();
+      delete notesOnPage[note.id];
+    }
+    if (minimizedChips[note.id]) {
+      minimizedChips[note.id].remove();
+      delete minimizedChips[note.id];
+    }
+    note.stuck = false;
+    note.locked = false;
+    note.updatedAt = Date.now();
+    ssSaveNote(note);
+  }
+
   function debounce(fn, wait) {
     let t;
     return (...args) => {
@@ -199,9 +242,54 @@
     tray = document.createElement('div');
     tray.id = 'ss-tray';
     tray.className = 'ss-tray';
+
+    const handle = document.createElement('div');
+    handle.className = 'ss-tray-handle';
+    handle.title = 'Drag to move';
+    handle.textContent = '⋮⋮';
+    tray.appendChild(handle);
+    wireTrayDrag(tray, handle);
+
     document.body.appendChild(tray);
     syncTrayOffset();
+
+    chrome.storage.local.get({ ssTrayPos: null }, (data) => {
+      if (data.ssTrayPos) {
+        tray.style.left = data.ssTrayPos.left + 'px';
+        tray.style.top = data.ssTrayPos.top + 'px';
+        tray.style.right = 'auto';
+      }
+    });
+
     return tray;
+  }
+
+  function wireTrayDrag(trayEl, handleEl) {
+    let dragging = false;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    handleEl.addEventListener('pointerdown', (e) => {
+      dragging = true;
+      const rect = trayEl.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+      handleEl.setPointerCapture(e.pointerId);
+    });
+
+    handleEl.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      trayEl.style.left = e.clientX - offsetX + 'px';
+      trayEl.style.top = e.clientY - offsetY + 'px';
+      trayEl.style.right = 'auto';
+    });
+
+    handleEl.addEventListener('pointerup', () => {
+      if (!dragging) return;
+      dragging = false;
+      const rect = trayEl.getBoundingClientRect();
+      chrome.storage.local.set({ ssTrayPos: { left: rect.left, top: rect.top } });
+    });
   }
 
   // Dispatches to the right representation (full card vs. minimized chip)
@@ -229,8 +317,9 @@
           COLORS.map((c) => `<button class="ss-color-dot" data-color="${c}" style="background:${c}" title="Change color"></button>`).join('') +
         '</div>' +
         '<div class="ss-note-actions">' +
+          `<button class="ss-note-lock" title="${note.locked ? 'Locked — showing on every page' : 'Lock — show this note on every page'}">${note.locked ? '\u{1F512}' : '\u{1F513}'}</button>` +
           '<button class="ss-note-minimize" title="Minimize">−</button>' +
-          '<button class="ss-note-delete" title="Delete note">✕</button>' +
+          '<button class="ss-note-delete" title="Remove from this page (kept in your Sticky Note Bank)">✕</button>' +
         '</div>' +
       '</div>' +
       '<div class="ss-note-project-row">' +
@@ -238,8 +327,21 @@
           '<option value="">No project</option>' +
         '</select>' +
       '</div>' +
-      `<textarea class="ss-note-text" placeholder="Write a note...">${ssEscapeHtml(note.text || '')}</textarea>` +
+      '<div class="ss-note-toolbar">' +
+        '<button class="ss-fmt-btn ss-fmt-bold" data-command="bold" title="Bold (Ctrl/Cmd+B)"><b>B</b></button>' +
+        '<button class="ss-fmt-btn ss-fmt-italic" data-command="italic" title="Italic (Ctrl/Cmd+I)"><i>I</i></button>' +
+        '<button class="ss-fmt-btn ss-fmt-bullet" data-command="insertUnorderedList" title="Bullet list">☰</button>' +
+        '<select class="ss-fmt-size" title="Text size">' +
+          '<option value="" selected disabled>Size</option>' +
+          '<option value="11px">Small</option>' +
+          '<option value="13px">Normal</option>' +
+          '<option value="17px">Large</option>' +
+        '</select>' +
+      '</div>' +
+      '<div class="ss-note-text" contenteditable="true" data-placeholder="Write a note..."></div>' +
       '<div class="ss-note-resize" title="Drag to resize"></div>';
+
+    el.querySelector('.ss-note-text').innerHTML = note.html != null ? note.html : ssEscapeHtml(note.text || '');
 
     document.body.appendChild(el);
     notesOnPage[note.id] = el;
@@ -287,7 +389,7 @@
 
   function wireCardEvents(el, note) {
     const handle = el.querySelector('.ss-note-handle');
-    const textarea = el.querySelector('.ss-note-text');
+    const textEl = el.querySelector('.ss-note-text');
     const resizeHandle = el.querySelector('.ss-note-resize');
 
     let dragging = false;
@@ -352,14 +454,73 @@
       ssSaveNote(note);
     });
 
-    textarea.addEventListener(
-      'input',
-      debounce(() => {
-        note.text = textarea.value;
-        note.updatedAt = Date.now();
-        ssSaveNote(note);
-      }, 400)
-    );
+    const saveText = debounce(() => {
+      note.html = textEl.innerHTML;
+      note.text = ssHtmlToText(note.html);
+      note.updatedAt = Date.now();
+      ssSaveNote(note);
+    }, 400);
+
+    textEl.addEventListener('input', saveText);
+
+    textEl.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      e.preventDefault();
+      const inList = document.queryCommandState('insertUnorderedList') || document.queryCommandState('insertOrderedList');
+      if (inList) {
+        document.execCommand(e.shiftKey ? 'outdent' : 'indent');
+      } else if (!e.shiftKey) {
+        document.execCommand('insertHTML', false, '&emsp;');
+      }
+      saveText();
+    });
+
+    el.querySelectorAll('.ss-fmt-btn').forEach((btn) => {
+      // Prevent the button from stealing focus, which would otherwise
+      // collapse the text selection the command is meant to apply to.
+      btn.addEventListener('mousedown', (e) => e.preventDefault());
+      btn.addEventListener('click', () => {
+        textEl.focus();
+        document.execCommand(btn.dataset.command);
+        saveText();
+      });
+    });
+
+    const sizeSelect = el.querySelector('.ss-fmt-size');
+    let savedRange = null;
+
+    sizeSelect.addEventListener('mousedown', () => {
+      const sel = window.getSelection();
+      if (sel.rangeCount > 0 && textEl.contains(sel.anchorNode)) {
+        savedRange = sel.getRangeAt(0).cloneRange();
+      }
+    });
+
+    sizeSelect.addEventListener('change', () => {
+      const size = sizeSelect.value;
+      sizeSelect.selectedIndex = 0;
+      if (!size) return;
+
+      textEl.focus();
+      const sel = window.getSelection();
+      if (savedRange) {
+        sel.removeAllRanges();
+        sel.addRange(savedRange);
+      }
+
+      // execCommand('fontSize') only supports a fixed 1-7 scale, so apply a
+      // throwaway size (7) and swap the resulting <font> tags for styled
+      // <span>s with the actual pixel size we want.
+      document.execCommand('fontSize', false, '7');
+      textEl.querySelectorAll('font[size="7"]').forEach((font) => {
+        const span = document.createElement('span');
+        span.style.fontSize = size;
+        while (font.firstChild) span.appendChild(font.firstChild);
+        font.replaceWith(span);
+      });
+
+      saveText();
+    });
 
     el.querySelectorAll('.ss-color-dot').forEach((dot) => {
       dot.addEventListener('click', () => {
@@ -400,13 +561,18 @@
     }
 
     el.querySelector('.ss-note-delete').addEventListener('click', () => {
-      el.remove();
-      delete notesOnPage[note.id];
-      ssDeleteNote(note.id);
+      unstickNote(note);
     });
 
     el.querySelector('.ss-note-minimize').addEventListener('click', () => {
       minimizeNote(note, el);
+    });
+
+    const lockBtn = el.querySelector('.ss-note-lock');
+    lockBtn.addEventListener('click', () => {
+      toggleLock(note);
+      lockBtn.textContent = note.locked ? '\u{1F512}' : '\u{1F513}';
+      lockBtn.title = note.locked ? 'Locked — showing on every page' : 'Lock — show this note on every page';
     });
   }
 
@@ -439,14 +605,20 @@
     chip.innerHTML =
       `<span class="ss-chip-dot" style="background:${note.color || COLORS[0]}"></span>` +
       `<span class="ss-chip-text">${ssEscapeHtml(note.text && note.text.trim() ? note.text : '(empty note)')}</span>` +
-      '<button class="ss-chip-delete" title="Delete note">✕</button>';
+      `<button class="ss-chip-lock" title="${note.locked ? 'Locked — click to drop it on this page' : 'Lock — carry this note to another page'}">${note.locked ? '\u{1F512}' : '\u{1F513}'}</button>` +
+      '<button class="ss-chip-delete" title="Remove from this page (kept in your Sticky Note Bank)">✕</button>';
 
     chip.addEventListener('click', () => restoreNote(note, chip));
+    const chipLockBtn = chip.querySelector('.ss-chip-lock');
+    chipLockBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleLock(note);
+      chipLockBtn.textContent = note.locked ? '\u{1F512}' : '\u{1F513}';
+      chipLockBtn.title = note.locked ? 'Locked — click to drop it on this page' : 'Lock — carry this note to another page';
+    });
     chip.querySelector('.ss-chip-delete').addEventListener('click', (e) => {
       e.stopPropagation();
-      chip.remove();
-      delete minimizedChips[note.id];
-      ssDeleteNote(note.id);
+      unstickNote(note);
     });
 
     getTray().appendChild(chip);
@@ -520,12 +692,15 @@
       url: location.href,
       title: document.title,
       text: '',
+      html: '',
       color: COLORS[0],
       width: DEFAULT_WIDTH,
       height: DEFAULT_HEIGHT,
       x: Math.round(window.scrollX + 120),
       y: Math.round(window.scrollY + 120),
       minimized: false,
+      locked: false,
+      stuck: true,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       projectId: null,
@@ -542,7 +717,7 @@
 
   function loadNotesForPage() {
     ssGetAllNotes((all) => {
-      const onPage = Object.values(all).filter((n) => n.pageKey === pageKey);
+      const onPage = Object.values(all).filter(belongsOnThisPage);
       onPage.forEach(renderNote);
       if (onPage.length) markPageInvoked();
     });
@@ -552,6 +727,32 @@
     if (message.type === 'ADD_NOTE') {
       createNewNote();
       sendResponse({ ok: true });
+      return;
+    }
+
+    if (message.type === 'STICK_NOTE') {
+      ssGetAllNotes((all) => {
+        const note = all[message.noteId];
+        if (!note) {
+          sendResponse({ ok: false });
+          return;
+        }
+        note.stuck = true;
+        note.locked = false;
+        note.minimized = false;
+        note.pageKey = pageKey;
+        note.url = location.href;
+        note.title = document.title;
+        note.x = Math.round(window.scrollX + 120);
+        note.y = Math.round(window.scrollY + 120);
+        note.updatedAt = Date.now();
+        ssSaveNote(note, () => {
+          renderCard(note);
+          markPageInvoked();
+          sendResponse({ ok: true });
+        });
+      });
+      return true; // async response
     }
   });
 
@@ -567,7 +768,7 @@
     const newNotes = changes.notes.newValue || {};
 
     Object.keys(notesOnPage).forEach((id) => {
-      if (!newNotes[id]) {
+      if (!newNotes[id] || !belongsOnThisPage(newNotes[id])) {
         notesOnPage[id].remove();
         delete notesOnPage[id];
         return;
@@ -575,14 +776,14 @@
       refreshProjectSelect(notesOnPage[id], newNotes[id]);
     });
     Object.keys(minimizedChips).forEach((id) => {
-      if (!newNotes[id]) {
+      if (!newNotes[id] || !belongsOnThisPage(newNotes[id])) {
         minimizedChips[id].remove();
         delete minimizedChips[id];
       }
     });
 
     Object.values(newNotes)
-      .filter((n) => n.pageKey === pageKey && !notesOnPage[n.id] && !minimizedChips[n.id])
+      .filter((n) => belongsOnThisPage(n) && !notesOnPage[n.id] && !minimizedChips[n.id])
       .forEach(renderNote);
 
     if (Object.values(newNotes).some((n) => n.pageKey === pageKey)) {

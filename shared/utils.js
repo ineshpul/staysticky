@@ -38,6 +38,15 @@ function ssEscapeHtml(str) {
   return d.innerHTML;
 }
 
+// Strips HTML markup down to plain text. Used to keep note.text as a plain
+// mirror of note.html, so every plain-text consumer (bank list, chip
+// preview, the web library's cards/search/exports) keeps working untouched.
+function ssHtmlToText(html) {
+  const d = document.createElement('div');
+  d.innerHTML = html || '';
+  return (d.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
 function ssGetAllProjects(callback) {
   chrome.storage.local.get({ projects: {} }, (data) => callback(data.projects || {}));
 }

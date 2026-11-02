@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell } from "./AppShell";
 import { useLibrary } from "@/lib/library";
 import { NOTE_COLORS } from "@/lib/types";
-import { formatShortDate, hostnameOf } from "@/lib/utils";
+import { formatShortDate, hostnameOf, htmlToText } from "@/lib/utils";
 
 export function NoteDetailPage({ noteId }: { noteId: string }) {
   const router = useRouter();
@@ -20,6 +20,35 @@ export function NoteDetailPage({ noteId }: { noteId: string }) {
   const related = notes
     .filter((n) => n.id !== noteId && !n.archived && n.projectId && n.projectId === note?.projectId)
     .slice(0, 4);
+
+  const textRef = useRef<HTMLDivElement | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Uncontrolled on purpose: writing note.html back into the DOM on every
+  // keystroke would reset the caret. Only resync when a different note loads.
+  useEffect(() => {
+    if (!textRef.current || !note) return;
+    const el = document.createElement("div");
+    el.textContent = note.text || "";
+    const html = note.html != null ? note.html : el.innerHTML;
+    textRef.current.innerHTML = html;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note?.id]);
+
+  function scheduleTextSave() {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      if (!textRef.current || !note) return;
+      const html = textRef.current.innerHTML;
+      void upsertNote({ ...note, html, text: htmlToText(html), updatedAt: Date.now() });
+    }, 400);
+  }
+
+  function applyCommand(command: string) {
+    textRef.current?.focus();
+    document.execCommand(command);
+    scheduleTextSave();
+  }
 
   if (!note) {
     return (
@@ -128,18 +157,54 @@ export function NoteDetailPage({ noteId }: { noteId: string }) {
                 />
               ))}
             </div>
-            <p
+            <div
+              style={{
+                display: "flex",
+                gap: 2,
+                padding: "4px 10px",
+                borderBottom: "1px solid rgba(0,0,0,.08)",
+              }}
+            >
+              {[
+                { command: "bold", label: <b>B</b>, title: "Bold" },
+                { command: "italic", label: <i>I</i>, title: "Italic" },
+                { command: "insertUnorderedList", label: "☰", title: "Bullet list" },
+              ].map(({ command, label, title }) => (
+                <button
+                  key={command}
+                  type="button"
+                  title={title}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applyCommand(command)}
+                  style={{
+                    width: 26,
+                    height: 22,
+                    background: "transparent",
+                    border: "none",
+                    borderRadius: 4,
+                    cursor: "pointer",
+                    fontSize: 12,
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div
+              ref={textRef}
+              contentEditable
+              suppressContentEditableWarning
+              onInput={scheduleTextSave}
               style={{
                 margin: 0,
-                padding: "18px 16px 44px",
+                padding: "14px 16px 44px",
+                minHeight: 120,
                 fontSize: 15,
                 lineHeight: 1.55,
                 color: "#2b2b2b",
-                whiteSpace: "pre-wrap",
+                outline: "none",
               }}
-            >
-              {note.text || "Empty note"}
-            </p>
+            />
           </div>
 
           <div style={{ marginTop: 18, maxWidth: 340 }}>

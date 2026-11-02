@@ -14,12 +14,19 @@ export type Note = {
   url: string;
   title: string;
   text: string;
+  /** Rich-text HTML version of the note (bold/italic/bullets). `text` is kept
+   * as a plain-text mirror of this for search, exports, and card previews. */
+  html?: string | null;
   color: string;
   width?: number;
   height?: number;
   x?: number;
   y?: number;
   minimized?: boolean;
+  /** Universal note: shows on every page, not just pageKey's. */
+  locked?: boolean;
+  /** false once a note has been taken off every page (lives only in the bank). */
+  stuck?: boolean;
   createdAt: number;
   updatedAt: number;
   projectId: string | null;

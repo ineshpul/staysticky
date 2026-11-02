@@ -1,5 +1,16 @@
 import type { Note } from "./types";
 
+/** Strips HTML markup down to plain text, for search/export/card previews. */
+export function htmlToText(html: string | null | undefined): string {
+  if (!html) return "";
+  if (typeof document === "undefined") {
+    return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  }
+  const d = document.createElement("div");
+  d.innerHTML = html;
+  return (d.textContent || "").replace(/\s+/g, " ").trim();
+}
+
 export function hostnameOf(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, "");

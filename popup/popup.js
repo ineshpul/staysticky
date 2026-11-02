@@ -35,6 +35,29 @@ function onAddNote() {
   });
 }
 
+function isStuck(note) {
+  return note.stuck !== false;
+}
+
+function stickNoteHere(note, errorEl) {
+  errorEl.hidden = true;
+
+  if (!currentTab || !/^https?:/.test(currentTab.url || '')) {
+    errorEl.textContent = "Can't stick a note on this page.";
+    errorEl.hidden = false;
+    return;
+  }
+
+  chrome.tabs.sendMessage(currentTab.id, { type: 'STICK_NOTE', noteId: note.id }, (resp) => {
+    if (chrome.runtime.lastError || !resp || !resp.ok) {
+      errorEl.textContent = 'Reload that page and try again.';
+      errorEl.hidden = false;
+      return;
+    }
+    window.close();
+  });
+}
+
 function onCreateProject() {
   const input = document.getElementById('ssNewProjectName');
   const name = (input.value || '').trim();
@@ -79,40 +102,61 @@ function renderBank() {
       }
       emptyEl.hidden = true;
 
-      const groups = {};
-      const order = [];
-      notes.forEach((n) => {
-        if (!groups[n.pageKey]) {
-          groups[n.pageKey] = [];
-          order.push(n.pageKey);
-        }
-        groups[n.pageKey].push(n);
-      });
+      const stuckNotes = notes.filter(isStuck);
+      const unstuckNotes = notes.filter((n) => !isStuck(n));
 
-      order.forEach((pageKey) => {
-        const group = groups[pageKey];
-        const site = group[0];
+      if (stuckNotes.length) {
+        const groups = {};
+        const order = [];
+        stuckNotes.forEach((n) => {
+          if (!groups[n.pageKey]) {
+            groups[n.pageKey] = [];
+            order.push(n.pageKey);
+          }
+          groups[n.pageKey].push(n);
+        });
 
+        order.forEach((pageKey) => {
+          const group = groups[pageKey];
+          const site = group[0];
+
+          const groupEl = document.createElement('div');
+          groupEl.className = 'ss-group';
+
+          const titleEl = document.createElement('div');
+          titleEl.className = 'ss-group-title';
+          titleEl.title = site.url;
+          titleEl.textContent = site.title || site.url;
+          groupEl.appendChild(titleEl);
+
+          group.forEach((note) => {
+            groupEl.appendChild(buildNoteItem(note, projects, true));
+          });
+
+          listEl.appendChild(groupEl);
+        });
+      }
+
+      if (unstuckNotes.length) {
         const groupEl = document.createElement('div');
         groupEl.className = 'ss-group';
 
         const titleEl = document.createElement('div');
         titleEl.className = 'ss-group-title';
-        titleEl.title = site.url;
-        titleEl.textContent = site.title || site.url;
+        titleEl.textContent = 'Not stuck to a page';
         groupEl.appendChild(titleEl);
 
-        group.forEach((note) => {
-          groupEl.appendChild(buildNoteItem(note, projects));
+        unstuckNotes.forEach((note) => {
+          groupEl.appendChild(buildNoteItem(note, projects, false));
         });
 
         listEl.appendChild(groupEl);
-      });
+      }
     });
   });
 }
 
-function buildNoteItem(note, projects) {
+function buildNoteItem(note, projects, stuck) {
   const item = document.createElement('div');
   item.className = 'ss-note-item';
 
@@ -182,17 +226,39 @@ function buildNoteItem(note, projects) {
   body.appendChild(snippet);
   body.appendChild(select);
 
-  const del = document.createElement('button');
-  del.className = 'ss-note-item-delete';
-  del.title = 'Delete note';
-  del.textContent = '✕';
-
   item.appendChild(swatch);
   item.appendChild(body);
+
+  if (stuck) {
+    const openBtn = document.createElement('button');
+    openBtn.className = 'ss-note-item-action';
+    openBtn.title = 'Open this page';
+    openBtn.textContent = '↗';
+    openBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      chrome.tabs.create({ url: note.url });
+    });
+    item.appendChild(openBtn);
+  } else {
+    const stickBtn = document.createElement('button');
+    stickBtn.className = 'ss-note-item-action';
+    stickBtn.title = 'Stick to the current page';
+    stickBtn.textContent = '\u{1F4CC}';
+    stickBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      stickNoteHere(note, errorEl);
+    });
+    item.appendChild(stickBtn);
+  }
+
+  const del = document.createElement('button');
+  del.className = 'ss-note-item-delete';
+  del.title = 'Delete permanently';
+  del.textContent = '\u{1F5D1}';
   item.appendChild(del);
 
   item.addEventListener('click', () => {
-    chrome.tabs.create({ url: note.url });
+    if (stuck) chrome.tabs.create({ url: note.url });
   });
 
   del.addEventListener('click', (e) => {
@@ -200,5 +266,13 @@ function buildNoteItem(note, projects) {
     ssDeleteNote(note.id, renderBank);
   });
 
-  return item;
+  const wrap = document.createElement('div');
+  wrap.className = 'ss-note-item-wrap';
+  const errorEl = document.createElement('p');
+  errorEl.className = 'ss-item-error';
+  errorEl.hidden = true;
+  wrap.appendChild(item);
+  wrap.appendChild(errorEl);
+
+  return wrap;
 }
