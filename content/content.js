@@ -140,9 +140,63 @@
   const MIN_HEIGHT = 120;
 
   const pageKey = ssNormalizePageKey(location.href);
+  const pageKeyAliases = ssPageKeyAliases(location.href);
+  const coveredViewer = isCoveredViewerPage();
   const notesOnPage = {}; // id -> card element
   const minimizedChips = {}; // id -> chip element
   let tray = null;
+  let overlayHost = null;
+  let overlayObserver = null;
+
+  // Google's file preview covers the page. Notes go in a top-layer host so
+  // they stay visible above Drive, Docs, and Gmail.
+  function isCoveredViewerPage() {
+    const host = location.hostname;
+    return (
+      host === 'drive.google.com' ||
+      host === 'docs.google.com' ||
+      host === 'drive.usercontent.google.com' ||
+      host === 'mail.google.com' ||
+      host.endsWith('.googleusercontent.com')
+    );
+  }
+
+  function belongsOnPage(note) {
+    return Boolean(note && pageKeyAliases.has(note.pageKey));
+  }
+
+  function getUiRoot() {
+    if (!coveredViewer) return document.body || document.documentElement;
+    if (!overlayHost) {
+      overlayHost = document.createElement('div');
+      overlayHost.id = 'ss-overlay-host';
+      overlayHost.setAttribute('popover', 'manual');
+      overlayHost.style.cssText =
+        'position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;background:transparent;overflow:visible;pointer-events:none;z-index:2147483646;';
+    }
+    if (!overlayHost.isConnected && document.documentElement) {
+      document.documentElement.appendChild(overlayHost);
+      try {
+        overlayHost.showPopover();
+      } catch (e) {
+        /* popover is optional; the fixed host still sits above the page */
+      }
+    }
+    if (!overlayObserver && document.documentElement) {
+      overlayObserver = new MutationObserver(() => {
+        if (overlayHost && !overlayHost.isConnected && document.documentElement) {
+          document.documentElement.appendChild(overlayHost);
+          try {
+            overlayHost.showPopover();
+          } catch (e) {
+            /* already showing, or popover is unavailable */
+          }
+        }
+      });
+      overlayObserver.observe(document.documentElement, { childList: true });
+    }
+    return overlayHost;
+  }
   let quickAdd = null;
   let pageInvoked = false;
 
@@ -152,7 +206,7 @@
   // (stuck is treated as true when absent, for notes saved before this flag existed.)
   function belongsOnThisPage(note) {
     if (note.stuck === false) return false;
-    return note.locked || note.pageKey === pageKey;
+    return note.locked || belongsOnPage(note);
   }
 
   // Toggles lock state. Unlocking a note on a page other than its current
@@ -209,7 +263,8 @@
   /** Little sticky in the top-right after Stay Sticky is used on this page. */
   function ensureQuickAdd() {
     if (!pageInvoked && !pageHasNotes()) return;
-    if (quickAdd && document.body.contains(quickAdd)) {
+    if (quickAdd) {
+      if (!quickAdd.isConnected) getUiRoot().appendChild(quickAdd);
       quickAdd.hidden = false;
       syncTrayOffset();
       return;
@@ -228,7 +283,7 @@
       e.stopPropagation();
       createNewNote();
     });
-    document.body.appendChild(quickAdd);
+    getUiRoot().appendChild(quickAdd);
     syncTrayOffset();
   }
 
@@ -238,28 +293,29 @@
   }
 
   function getTray() {
-    if (tray) return tray;
-    tray = document.createElement('div');
-    tray.id = 'ss-tray';
-    tray.className = 'ss-tray';
+    if (!tray) {
+      tray = document.createElement('div');
+      tray.id = 'ss-tray';
+      tray.className = 'ss-tray';
 
-    const handle = document.createElement('div');
-    handle.className = 'ss-tray-handle';
-    handle.title = 'Drag to move';
-    handle.textContent = '⋮⋮';
-    tray.appendChild(handle);
-    wireTrayDrag(tray, handle);
+      const handle = document.createElement('div');
+      handle.className = 'ss-tray-handle';
+      handle.title = 'Drag to move';
+      handle.textContent = '⋮⋮';
+      tray.appendChild(handle);
+      wireTrayDrag(tray, handle);
 
-    document.body.appendChild(tray);
+      const trayEl = tray;
+      chrome.storage.local.get({ ssTrayPos: null }, (data) => {
+        if (data.ssTrayPos) {
+          trayEl.style.left = data.ssTrayPos.left + 'px';
+          trayEl.style.top = data.ssTrayPos.top + 'px';
+          trayEl.style.right = 'auto';
+        }
+      });
+    }
+    if (!tray.isConnected) getUiRoot().appendChild(tray);
     syncTrayOffset();
-
-    chrome.storage.local.get({ ssTrayPos: null }, (data) => {
-      if (data.ssTrayPos) {
-        tray.style.left = data.ssTrayPos.left + 'px';
-        tray.style.top = data.ssTrayPos.top + 'px';
-        tray.style.right = 'auto';
-      }
-    });
 
     return tray;
   }
@@ -300,7 +356,10 @@
   }
 
   function renderCard(note) {
-    if (notesOnPage[note.id]) return notesOnPage[note.id];
+    if (notesOnPage[note.id]) {
+      if (!notesOnPage[note.id].isConnected) getUiRoot().appendChild(notesOnPage[note.id]);
+      return notesOnPage[note.id];
+    }
 
     const el = document.createElement('div');
     el.className = 'ss-sticky-note';
@@ -309,6 +368,13 @@
     el.style.width = (note.width || DEFAULT_WIDTH) + 'px';
     el.style.height = (note.height || DEFAULT_HEIGHT) + 'px';
     el.style.background = note.color || COLORS[0];
+    if (coveredViewer) {
+      el.classList.add('ss-sticky-note-fixed');
+      const maxX = Math.max(16, window.innerWidth - (note.width || DEFAULT_WIDTH) - 16);
+      const maxY = Math.max(16, window.innerHeight - 48);
+      el.style.left = Math.min(Math.max(note.x || 96, 8), maxX) + 'px';
+      el.style.top = Math.min(Math.max(note.y || 96, 8), maxY) + 'px';
+    }
     el.dataset.noteId = note.id;
 
     el.innerHTML =
@@ -343,7 +409,7 @@
 
     el.querySelector('.ss-note-text').innerHTML = note.html != null ? note.html : ssEscapeHtml(note.text || '');
 
-    document.body.appendChild(el);
+    getUiRoot().appendChild(el);
     notesOnPage[note.id] = el;
     wireCardEvents(el, note);
     refreshProjectSelect(el, note);
@@ -399,15 +465,15 @@
     handle.addEventListener('pointerdown', (e) => {
       if (e.target.closest('button') || e.target.closest('select')) return;
       dragging = true;
-      offsetX = e.pageX - el.offsetLeft;
-      offsetY = e.pageY - el.offsetTop;
+      offsetX = (coveredViewer ? e.clientX : e.pageX) - el.offsetLeft;
+      offsetY = (coveredViewer ? e.clientY : e.pageY) - el.offsetTop;
       handle.setPointerCapture(e.pointerId);
     });
 
     handle.addEventListener('pointermove', (e) => {
       if (!dragging) return;
-      el.style.left = e.pageX - offsetX + 'px';
-      el.style.top = e.pageY - offsetY + 'px';
+      el.style.left = (coveredViewer ? e.clientX : e.pageX) - offsetX + 'px';
+      el.style.top = (coveredViewer ? e.clientY : e.pageY) - offsetY + 'px';
     });
 
     handle.addEventListener('pointerup', () => {
@@ -696,8 +762,8 @@
       color: COLORS[0],
       width: DEFAULT_WIDTH,
       height: DEFAULT_HEIGHT,
-      x: Math.round(window.scrollX + 120),
-      y: Math.round(window.scrollY + 120),
+      x: coveredViewer ? 88 + (Object.keys(notesOnPage).length % 4) * 24 : Math.round(window.scrollX + 120),
+      y: coveredViewer ? 88 + (Object.keys(notesOnPage).length % 4) * 24 : Math.round(window.scrollY + 120),
       minimized: false,
       locked: false,
       stuck: true,
@@ -718,7 +784,16 @@
   function loadNotesForPage() {
     ssGetAllNotes((all) => {
       const onPage = Object.values(all).filter(belongsOnThisPage);
-      onPage.forEach(renderNote);
+      onPage.forEach((note) => {
+        // Migrate old alias keys to the canonical one — but never re-home a
+        // locked note that is merely visiting this page.
+        if (!note.locked && note.pageKey !== pageKey) {
+          note.pageKey = pageKey;
+          note.updatedAt = Date.now();
+          ssSaveNote(note);
+        }
+        renderNote(note);
+      });
       if (onPage.length) markPageInvoked();
     });
   }
@@ -786,7 +861,7 @@
       .filter((n) => belongsOnThisPage(n) && !notesOnPage[n.id] && !minimizedChips[n.id])
       .forEach(renderNote);
 
-    if (Object.values(newNotes).some((n) => n.pageKey === pageKey)) {
+    if (Object.values(newNotes).some((n) => belongsOnPage(n))) {
       markPageInvoked();
     } else {
       syncTrayOffset();

@@ -275,7 +275,21 @@ export function collectProjectSources(notes: Note[]): ProjectSource[] {
   );
 }
 
-export function formatSourceCitation(source: ProjectSource, style: CitationStyleId): string {
+/** One piece of a reference. Italics and links are applied in Word export. */
+export type CitationSpan = {
+  text: string;
+  italics?: boolean;
+  href?: string;
+};
+
+function span(text: string, extra?: Pick<CitationSpan, "italics" | "href">): CitationSpan {
+  return extra ? { text, ...extra } : { text };
+}
+
+export function formatSourceCitationSpans(
+  source: ProjectSource,
+  style: CitationStyleId,
+): CitationSpan[] {
   const pageTitle = source.title;
   const site = source.siteName;
   const url = source.url.startsWith("http") ? source.url : `https://${source.url}`;
@@ -291,36 +305,89 @@ export function formatSourceCitation(source: ProjectSource, style: CitationStyle
         : `${titleCase(site)}. `;
     const date = formatApaDate(publishedAt);
     if (author) {
-      return `${formatApaAuthor(author)} (${date}). ${italicTitle}. ${sitePart}${url}`;
+      return [
+        span(`${formatApaAuthor(author)} (${date}). `),
+        span(italicTitle, { italics: true }),
+        span(`. ${sitePart}`),
+        span(url, { href: url }),
+      ];
     }
-    return `${italicTitle}. (${date}). ${sitePart}Retrieved ${apaAccessDate(source.accessedAt)}, from ${url}`;
+    return [
+      span(italicTitle, { italics: true }),
+      span(
+        `. (${date}). ${sitePart}Retrieved ${apaAccessDate(source.accessedAt)}, from `,
+      ),
+      span(url, { href: url }),
+    ];
   }
 
   if (style === "mla9") {
     const quoted = `"${titleCase(pageTitle)}."`;
     const container = titleCase(site);
     const pub = formatMlaDate(publishedAt);
+    const bare = stripUrlScheme(url);
     const access = `Accessed ${mlaAccessDate(source.accessedAt)}.`;
-    const mid = pub
-      ? `${quoted} ${container}, ${pub}, ${stripUrlScheme(url)}.`
-      : `${quoted} ${container}, ${stripUrlScheme(url)}. ${access}`;
-    if (author) return `${formatMlaAuthor(author)} ${mid}`;
-    return mid;
+    const spans: CitationSpan[] = [];
+    if (author) spans.push(span(`${formatMlaAuthor(author)} `));
+    spans.push(span(`${quoted} `));
+    spans.push(span(container, { italics: true }));
+    if (pub) {
+      spans.push(span(`, ${pub}, `));
+      spans.push(span(bare, { href: url }));
+      spans.push(span("."));
+    } else {
+      spans.push(span(", "));
+      spans.push(span(bare, { href: url }));
+      spans.push(span(`. ${access}`));
+    }
+    return spans;
   }
 
-  // Chicago 17 author-date
+  // Chicago 17 author-date. Website name is italic; the URL is linked.
   const pub = formatChicagoDate(publishedAt);
+  const quotedTitle = `"${titleCase(pageTitle)}."`;
+  const siteName = titleCase(site);
   if (author) {
     const who = chicagoAuthor(author);
     if (pub) {
-      return `${who}. ${pub}. "${titleCase(pageTitle)}." ${titleCase(site)}. ${url}.`;
+      return [
+        span(`${who}. ${pub}. ${quotedTitle} `),
+        span(siteName, { italics: true }),
+        span(". "),
+        span(url, { href: url }),
+        span("."),
+      ];
     }
-    return `${who}. n.d. "${titleCase(pageTitle)}." ${titleCase(site)}. Accessed ${chicagoAccessDate(source.accessedAt)}. ${url}.`;
+    return [
+      span(`${who}. n.d. ${quotedTitle} `),
+      span(siteName, { italics: true }),
+      span(`. Accessed ${chicagoAccessDate(source.accessedAt)}. `),
+      span(url, { href: url }),
+      span("."),
+    ];
   }
   if (pub) {
-    return `"${titleCase(pageTitle)}." ${titleCase(site)}. ${pub}. ${url}.`;
+    return [
+      span(`${quotedTitle} `),
+      span(siteName, { italics: true }),
+      span(`. ${pub}. `),
+      span(url, { href: url }),
+      span("."),
+    ];
   }
-  return `"${titleCase(pageTitle)}." ${titleCase(site)}. Accessed ${chicagoAccessDate(source.accessedAt)}. ${url}.`;
+  return [
+    span(`${quotedTitle} `),
+    span(siteName, { italics: true }),
+    span(`. Accessed ${chicagoAccessDate(source.accessedAt)}. `),
+    span(url, { href: url }),
+    span("."),
+  ];
+}
+
+export function formatSourceCitation(source: ProjectSource, style: CitationStyleId): string {
+  return formatSourceCitationSpans(source, style)
+    .map((part) => part.text)
+    .join("");
 }
 
 export function formatInTextCitation(source: ProjectSource, style: CitationStyleId): string {

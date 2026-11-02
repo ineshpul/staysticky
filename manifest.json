@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Stay Sticky",
-  "version": "1.2.4",
-  "description": "Pin virtual sticky notes to any webpage. They stay right where you left them, every time you come back.",
+  "version": "1.3.0",
+  "description": "Pin virtual sticky notes to any webpage or PDF. They stay right where you left them, every time you come back.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -28,6 +28,15 @@
       "run_at": "document_idle"
     }
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "mime_types_handler": {
+    "application/pdf": {
+      "handler_url": "pdf/viewer.html",
+      "can_embed": true
+    }
+  },
   "permissions": ["storage", "tabs"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "externally_connectable": {

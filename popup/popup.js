@@ -18,20 +18,32 @@ function init() {
 function onAddNote() {
   const errorEl = document.getElementById('ssAddNoteError');
   errorEl.hidden = true;
+  const url = (currentTab && currentTab.url) || '';
 
-  if (!currentTab || !/^https?:/.test(currentTab.url || '')) {
+  if (!currentTab || (!/^https?:/i.test(url) && !/^file:/i.test(url))) {
     errorEl.textContent = "Sticky notes can't be added on this page.";
     errorEl.hidden = false;
     return;
   }
 
-  chrome.tabs.sendMessage(currentTab.id, { type: 'ADD_NOTE' }, (resp) => {
-    if (chrome.runtime.lastError || !resp) {
-      errorEl.textContent = 'Reload the page and try again.';
-      errorEl.hidden = false;
+  chrome.runtime.sendMessage({ type: 'SS_ADD_NOTE_PDF', tabId: currentTab.id, url }, (pdfResp) => {
+    if (chrome.runtime.lastError) {
+      /* No PDF viewer in this tab. Fall through to the page. */
+    } else if (pdfResp && pdfResp.ok) {
+      window.close();
       return;
     }
-    window.close();
+
+    chrome.tabs.sendMessage(currentTab.id, { type: 'ADD_NOTE' }, (resp) => {
+      if (chrome.runtime.lastError || !resp || !resp.ok) {
+        errorEl.textContent = /^file:/i.test(url) || /\.pdf($|[?#])/i.test(url)
+          ? 'Could not attach a note to this PDF. Reload it, and use Chrome 151 or newer.'
+          : 'Reload the page and try again.';
+        errorEl.hidden = false;
+        return;
+      }
+      window.close();
+    });
   });
 }
 

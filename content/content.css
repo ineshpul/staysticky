@@ -302,3 +302,30 @@
 .ss-chip-delete:hover {
   color: #c62828;
 }
+
+#ss-overlay-host {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 2147483646;
+}
+
+#ss-overlay-host .ss-sticky-note,
+#ss-overlay-host .ss-quick-add,
+#ss-overlay-host .ss-tray,
+#ss-overlay-host .ss-chip {
+  pointer-events: auto;
+}
+
+.ss-sticky-note-fixed {
+  position: fixed;
+}

@@ -7,7 +7,7 @@ $out = Join-Path $root "staysticky-extension.zip"
 $stage = Join-Path $env:TEMP "staysticky-ext-pack"
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Path $stage | Out-Null
-$include = @("manifest.json","background.js","content","popup","shared","icons")
+$include = @("manifest.json","background.js","content","popup","shared","icons","pdf")
 foreach ($item in $include) {
   $src = Join-Path $root $item
   if (-not (Test-Path $src)) { throw "Missing $src" }
